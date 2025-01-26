@@ -253,7 +253,7 @@ def get_window_system() -> Type[WindowSystem]:
     window_system_type = get_window_system_type()
 
     # add new waland wms here, then add a match case below to import the class
-    supported_wayland_wms = {"sway", "Hyprland"}
+    supported_wayland_wms = {"sway", "Hyprland", "plasmashell"}
 
     window_system: Type[WindowSystem] | None = None
 
@@ -279,6 +279,9 @@ def get_window_system() -> Type[WindowSystem]:
             case "Hyprland":
                 from hints.window_systems.hyprland import \
                     Hyprland as window_system
+            case "plasmashell":
+                from hints.window_systems.plasmashell import \
+                    Plasmashell as window_system
 
     if not window_system:
         # adding x11 for an acurate report of the supported window systems

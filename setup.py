@@ -62,6 +62,13 @@ setup(
     license="GPLv3",
     packages=["hints", "hints.backends", "hints.huds", "hints.window_systems"],
     include_package_data=True,
-    install_requires=["PyGObject", "pillow", "pyscreenshot", "opencv-python"],
+    install_requires=[
+        "PyGObject",
+        "pillow",
+        "pyscreenshot",
+        "opencv-python",
+        "dbus-python",
+    ],
     entry_points={"console_scripts": ["hints = hints.hints:main"]},
+    scripts=["hints/scripts/kwin/active_window_information.mjs"],
 )
