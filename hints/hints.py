@@ -6,7 +6,7 @@ from itertools import product
 from math import ceil, log
 from subprocess import run
 from time import time
-from typing import TYPE_CHECKING, Any, Iterable, Type
+from typing import TYPE_CHECKING, Any, Iterable, Type, get_args
 
 from gi import require_version
 
@@ -19,7 +19,8 @@ from hints.mouse import MouseButtonActions, MouseButtons, click
 from hints.utils import HintsConfig, load_config
 from hints.window_systems.exceptions import WindowSystemNotSupported
 from hints.window_systems.window_system import WindowSystem
-from hints.window_systems.window_system_type import (WindowSystemType,
+from hints.window_systems.window_system_type import (SupportedWindowSystems,
+                                                     WindowSystemType,
                                                      get_window_system_type)
 
 if TYPE_CHECKING:
@@ -101,7 +102,9 @@ def display_gtk_window(
         GtkLayerShell.set_anchor(window, GtkLayerShell.Edge.LEFT, True)
         GtkLayerShell.set_layer(window, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_mode(window, GtkLayerShell.KeyboardMode.EXCLUSIVE)
-        GtkLayerShell.set_namespace(window, "hints") # Allows for compositor layer rules
+        GtkLayerShell.set_namespace(
+            window, "hints"
+        )  # Allows for compositor layer rules
 
     window.show_all()
     Gtk.main()
@@ -246,45 +249,64 @@ def hint_mode(config: HintsConfig, window_system: WindowSystem):
             break
 
 
-def get_window_system() -> Type[WindowSystem]:
-    """Get window system.
+def get_window_system_class(
+    window_system_id: SupportedWindowSystems | str,
+) -> Type[WindowSystem] | None:
+    """Get the window system class for the window system id.
 
-    :return: The window system for the current system.
+    :param window_system_id: A string identifying the supported window
+        system.
+    :return: The window system class.
     """
-    window_system_type = get_window_system_type()
-
-    # add new waland wms here, then add a match case below to import the class
-    supported_wayland_wms = {"sway", "Hyprland"}
 
     window_system: Type[WindowSystem] | None = None
 
-    if window_system_type == WindowSystemType.X11:
-        from hints.window_systems.x11 import X11 as window_system
-    if window_system_type == WindowSystemType.WAYLAND:
+    match window_system_id:
+        case "x11":
+            from hints.window_systems.x11 import X11 as window_system
+        case "sway":
+            from hints.window_systems.sway import Sway as window_system
+        case "hyprland":
+            from hints.window_systems.hyprland import Hyprland as window_system
 
-        # Check if there is a process running that matches the supported_wayland_wms
-        wayland_wm = (
-            run(
-                "ps -e -o comm | grep -m 1 -o -E "
-                + " ".join([f"-e '^{wm}$'" for wm in supported_wayland_wms]),
-                capture_output=True,
-                shell=True,
-            )
-            .stdout.decode("utf-8")
-            .strip()
-        )
+    return window_system
 
-        match wayland_wm:
-            case "sway":
-                from hints.window_systems.sway import Sway as window_system
-            case "Hyprland":
-                from hints.window_systems.hyprland import \
-                    Hyprland as window_system
+
+def get_window_system(window_system_id: str = "") -> Type[WindowSystem]:
+    """Get window system.
+
+    :param window_system_id: The window system id to use (see
+        get_window_system_class), otherwise, try to find the best match.
+    :return: The window system for the current system.
+    """
+
+    if not window_system_id:
+
+        window_system_type = get_window_system_type()
+
+        if window_system_type == WindowSystemType.X11:
+            window_system_id = "x11"
+        if window_system_type == WindowSystemType.WAYLAND:
+
+            # add new waland wms here, then add a match case below to import the class
+            supported_wayland_wms = {"sway", "Hyprland"}
+
+            # Check if there is a process running that matches the supported_wayland_wms
+            window_system_id = (
+                run(
+                    "ps -e -o comm | grep -m 1 -o -E "
+                    + " ".join([f"-e '^{wm}$'" for wm in supported_wayland_wms]),
+                    capture_output=True,
+                    shell=True,
+                )
+                .stdout.decode("utf-8")
+                .strip()
+            ).lower()
+
+    window_system = get_window_system_class(window_system_id)
 
     if not window_system:
-        # adding x11 for an acurate report of the supported window systems
-        supported_wayland_wms.add("x11")
-        raise WindowSystemNotSupported(supported_wayland_wms)
+        raise WindowSystemNotSupported(get_args(SupportedWindowSystems))
 
     return window_system
 
@@ -327,7 +349,7 @@ def main():
     else:
         logging.basicConfig(level=logging.INFO, format=custom_format)
 
-    window_system = get_window_system()()
+    window_system = get_window_system(config["window_system"])()
 
     match args.mode:
         case "hint":

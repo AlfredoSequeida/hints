@@ -2,6 +2,8 @@
 
 from enum import Enum
 from os import getenv
+from typing import Literal
+
 from hints.window_systems.exceptions import CouldNotIdentifyWindowSystemType
 
 
@@ -10,6 +12,9 @@ class WindowSystemType(Enum):
 
     X11 = "x11"
     WAYLAND = "wayland"
+
+
+SupportedWindowSystems = Literal["x11", "sway", "hyprland"]
 
 
 def get_window_system_type() -> WindowSystemType:

@@ -1,6 +1,7 @@
 """Linux window system."""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from hints.window_systems.window_system_type import get_window_system_type
