@@ -127,7 +127,7 @@ s = setup(
     packages=["hints", "hints.backends", "hints.huds", "hints.window_systems"],
     include_package_data=True,
     install_requires=[
-        "PyGObject",
+        "PyGObject==3.50.0",
         "pillow",
         "pyscreenshot",
         "opencv-python",
