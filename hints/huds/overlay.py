@@ -216,7 +216,7 @@ class OverlayWindow(Gtk.Window):
         keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
 
         # if keyval is bound, keyval, effective_group, level, consumed_modifiers
-        _, keyval, _, _, consumed_modifiers = keymap.translate_keyboard_state(
+        *_, consumed_modifiers = keymap.translate_keyboard_state(
             event.hardware_keycode,
             Gdk.ModifierType(event.state & ~Gdk.ModifierType.LOCK_MASK),
             1,
@@ -229,7 +229,7 @@ class OverlayWindow(Gtk.Window):
             & ~consumed_modifiers
         )
 
-        keyval_lower = Gdk.keyval_to_lower(keyval)
+        keyval_lower = Gdk.keyval_to_lower(event.keyval)
 
         if keyval_lower == self.exit_key:
             Gtk.main_quit()
@@ -240,7 +240,7 @@ class OverlayWindow(Gtk.Window):
         if modifiers == self.grab_modifier:
             self.mouse_action.update({"action": "grab"})
 
-        if keyval_lower != keyval:
+        if keyval_lower != event.keyval:
             self.mouse_action.update({"action": "click", "button": MouseButton.RIGHT})
 
         hint_chr = chr(keyval_lower)
