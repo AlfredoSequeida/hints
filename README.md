@@ -30,6 +30,9 @@ Don't like the keybindings? That's ok, you can change them.
 
 # Installing
 
+> [!NOTE]
+> Hints WILL NOT work on Gnome under Wayland. See [this](https://github.com/AlfredoSequeida/hints/issues/55) issue for an explanation. It WILL however work under X11.
+
 ## System Requirements
 
 1. You will need to have some sort of [compositing](https://wiki.archlinux.org/title/Xorg#Composite) setup so that you can properly overlay hints over windows with the correct level of transparency. Otherwise, the overlay will just cover the entire screen; not allowing you to see what is under the overlay.
