@@ -60,7 +60,7 @@ Ubuntu
 
 ```
 sudo apt update && \
-    sudo apt install git libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-4.0 pipx && \
+    sudo apt install git libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-4.0 pipx cmake libdbus-1-dev && \
     [ $XDG_SESSION_TYPE = "wayland" ] && sudo apt install gtk-layer-shell grim && \
     pipx ensurepath && \
     pipx install git+https://github.com/AlfredoSequeida/hints.git
@@ -90,7 +90,9 @@ Finally, source your shell config or restart your terminal.
 ## Setup
 
 1. Follow the setup instructions for your window system [here](https://github.com/AlfredoSequeida/hints/wiki/Window-Manager-and-Desktop-Environment-Setup-Guide).
-2. At this point, hints should be installed, you can verify this by running `hints` in your shell. If you still don't see any hints, the application you're testing could need a bit of extra setup. Please see the [Help,-hints-doesn't-work-with-X-application](https://github.com/AlfredoSequeida/hints/wiki/Help,-hints-doesn't-work-with-X-application) page in the wiki.
+2. Confirm that the uinput kernel module is loaded. If it is not 
+`sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf`
+3. At this point, hints should be installed, you can verify this by running `hints` in your shell. If you still don't see any hints, the application you're testing could need a bit of extra setup. Please see the [Help,-hints-doesn't-work-with-X-application](https://github.com/AlfredoSequeida/hints/wiki/Help,-hints-doesn't-work-with-X-application) page in the wiki.
 
 # Documentation
 
