@@ -163,3 +163,4 @@ cython_debug/
 
 # Excluded because I had to hardwire my home directory for fakegir stubs
 pyrightconfig.json
+pyproject.toml
