@@ -1,0 +1,16 @@
+<node>
+    <interface name="uk.co.realh.Hints.WindowSystem">
+        <method name="FocusedWindowExtents">
+            <arg type="i" direction="out" name="x"/>
+            <arg type="i" direction="out" name="y"/>
+            <arg type="i" direction="out" name="width"/>
+            <arg type="i" direction="out" name="height"/>
+        </method>
+        <method name="FocusedWindowPid">
+            <arg type="i" direction="out" name="pid"/>
+        </method>
+        <method name="FocusedApplicationName">
+            <arg type="s" direction="out" name="name"/>
+        </method>
+    </interface>
+</node>
