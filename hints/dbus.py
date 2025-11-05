@@ -31,6 +31,15 @@ class DBusHintsProxy:
                     cancellable = None
                 )   # type: ignore
 
+    def position_window(self, x, y, monitor, pid, title):
+        self.proxy.call_sync(
+                    method_name = "PositionWindow",
+                    parameters = (x, y, monitor, pid, title),
+                    flags = Gio.DBusCallFlags.NONE,
+                    timeout_msec = -1,
+                    cancellable = None
+                )
+
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
