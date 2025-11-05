@@ -20,7 +20,9 @@ class DBusHintsProxy:
             proxy = DBusHintsProxy._proxy
         self.proxy: Gio.DBusProxy = proxy   # type: ignore
 
-    def get_focused_window_info(self) -> tuple[int, int, int, int, int, str]:
+    def get_focused_window_info(self) \
+            -> tuple[int, int, int, int, int, str, int]:
+        """ Returns x, y, width, height, pid, name, monitor. """
         return self.proxy.call_sync(
                     method_name = "FocusedWindowInfo",
                     parameters = None,

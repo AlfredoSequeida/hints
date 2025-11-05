@@ -16,7 +16,7 @@ class Gnome(WindowSystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         dbus_proxy = DBusHintsProxy.get_instance()
-        self.window_info: tuple[int, int, int, int, int, str] = \
+        self.window_info: tuple[int, int, int, int, int, str, int] = \
                 dbus_proxy.get_focused_window_info()
 
     @property
@@ -55,3 +55,12 @@ class Gnome(WindowSystem):
         :return: Focused application name.
         """
         return self.window_info[5]
+
+    @property
+    def focused_window_monitor(self) -> int:
+        """Get the index of the monitor the focused window occupies.
+
+        :return: Monitor of focused window.
+        """
+        return self.window_info[6]
+

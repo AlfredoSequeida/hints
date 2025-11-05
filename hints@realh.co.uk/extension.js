@@ -47,16 +47,17 @@ export default class HintsExtension {
 }
 
 class Hints {
-    // Returns [x, y, width, height, pid, name]
-    // If no window is focused, returns [0, 0, 0, 0, -1, ""]
+    // Returns [x, y, width, height, pid, name, monitor].
+    // If no window is focused, returns [0, 0, 0, 0, -1, "", -1]
     FocusedWindowInfo() {
         const w = global.display.get_focus_window();
         if (!w) {
-            return [0, 0, 0, 0, -1, ""];
+            return [0, 0, 0, 0, -1, "", -1];
         }
         const {x, y, width, height} = w.get_frame_rect();
         const pid = w.get_pid();
         const name = w.get_wm_class();
-        return [x, y, width, height, pid, name];
+        const monitor = w.get_monitor();
+        return [x, y, width, height, pid, name, monitor];
     }
 }
