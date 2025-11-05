@@ -1,10 +1,7 @@
 import Gio from 'gi://Gio';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-// import St from 'gi://St';
-// import Main from 'resource:///org/gnome/shell/ui/main.js';
-
-export default class HintsExtension {
+export default class HintsExtension extends Extension {
     constructor() {
         this._ownership = null;
         const f = Gio.File.new_for_path(`${this.path}/uk.co.realh.Hints.xml`);
@@ -48,7 +45,8 @@ export default class HintsExtension {
 
 class Hints {
     // Returns [x, y, width, height, pid, name, monitor].
-    // If no window is focused, returns [0, 0, 0, 0, -1, "", -1]
+    // If no window is focused, returns [0, 0, 0, 0, -1, "", -1].
+    // monitor is the index as returned by Meta.Window.get_monitor().
     FocusedWindowInfo() {
         const w = global.display.get_focus_window();
         if (!w) {
@@ -59,5 +57,24 @@ class Hints {
         const name = w.get_wm_class();
         const monitor = w.get_monitor();
         return [x, y, width, height, pid, name, monitor];
+    }
+
+    // This is called before a window is shown. When the window matching pid
+    // and title is shown, it will be set to the given position and monitor.
+    PositionWindow(x, y, monitor, pid, title) {
+        let handler_id = null
+        handler_id = global.display.connect("window-created",
+            (_display, window) => {
+                if (window.get_pid() !== pid || window.get_title() !== title) {
+                    return
+                }
+                window.move(x, y);
+                window.set_monitor(monitor);
+                if (handler_id !== null) {
+                    global.display.disconnect(handler_id);
+                    handler_id = null;
+                }
+            }
+        );
     }
 }

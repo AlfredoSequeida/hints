@@ -1,3 +1,4 @@
+<!-- See extnesion.js for details -->
 <node>
     <interface name="uk.co.realh.Hints">
         <method name="FocusedWindowInfo">
@@ -8,6 +9,13 @@
             <arg type="i" direction="out" name="pid"/>
             <arg type="s" direction="out" name="name"/>
             <arg type="i" direction="out" name="monitor"/>
+        </method>
+        <method name="PositionWindow">
+            <arg type="i" direction="in" name="x"/>
+            <arg type="i" direction="in" name="y"/>
+            <arg type="i" direction="in" name="monitor"/>
+            <arg type="i" direction="in" name="pid"/>
+            <arg type="s" direction="in" name="title"/>
         </method>
     </interface>
 </node>
