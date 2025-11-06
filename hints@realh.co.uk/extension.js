@@ -93,8 +93,8 @@ class Hints {
                     return;
                 }
                 console.log(`uk.co.realh.Hints: ${p} == ${pid}`);
-                window.move(x, y);
-                window.set_monitor(monitor);
+                window.move_to_monitor(monitor);
+                window.move_frame(true, x, y);
                 if (handler_id !== null) {
                     global.display.disconnect(handler_id);
                     handler_id = null;
