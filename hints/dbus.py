@@ -1,4 +1,4 @@
-from gi.repository import Gio
+from gi.repository import Gio, GLib
 from typing import Optional
 
 class DBusHintsProxy:
@@ -34,7 +34,13 @@ class DBusHintsProxy:
     def position_window(self, x, y, monitor, pid, title):
         self.proxy.call_sync(
                     method_name = "PositionWindow",
-                    parameters = (x, y, monitor, pid, title),
+                    parameters = GLib.Variant.new_tuple(
+                        GLib.Variant.new_int32(x),
+                        GLib.Variant.new_int32(y),
+                        GLib.Variant.new_int32(monitor),
+                        GLib.Variant.new_int32(pid),
+                        GLib.Variant.new_string(title)
+                    ),
                     flags = Gio.DBusCallFlags.NONE,
                     timeout_msec = -1,
                     cancellable = None

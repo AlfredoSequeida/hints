@@ -82,7 +82,7 @@ def display_gtk_window(
     if window_system.window_system_name == "gnome":
         from hints.gnome_overlay import init_overlay_window
         init_overlay_window(window, window_system, window_x_pos, window_y_pos)
-    if window_system.window_system_type == WindowSystemType.WAYLAND:
+    elif window_system.window_system_type == WindowSystemType.WAYLAND:
         require_version("GtkLayerShell", "0.1")
         from gi.repository import GtkLayerShell
 

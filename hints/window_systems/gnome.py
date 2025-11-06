@@ -35,7 +35,8 @@ class Gnome(WindowSystem):
 
         :return: Active window extents (x, y, width, height).
         """
-        return self.window_info[:4]
+        e = self.window_info
+        return (e[0], e[1], e[2], e[3])
 
     @property
     def focused_window_pid(self) -> int:
