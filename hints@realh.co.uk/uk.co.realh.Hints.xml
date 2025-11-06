@@ -1,4 +1,4 @@
-<!-- See extnesion.js for details -->
+<!-- See extension.js for details -->
 <node>
     <interface name="uk.co.realh.Hints">
         <method name="FocusedWindowInfo">
@@ -15,7 +15,6 @@
             <arg type="i" direction="in" name="y"/>
             <arg type="i" direction="in" name="monitor"/>
             <arg type="i" direction="in" name="pid"/>
-            <arg type="s" direction="in" name="title"/>
         </method>
     </interface>
 </node>

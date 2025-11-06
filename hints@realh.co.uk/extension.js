@@ -59,23 +59,49 @@ class Hints {
         const pid = w.get_pid();
         const name = w.get_wm_class();
         const monitor = w.get_monitor();
+        console.log("uk.co.realh.Hints: FocusedWindowInfo => (" +
+            `x=${x}, y=${y}, w=${width}, h=${height}, p=${pid}, ` +
+            `name="${name}", monitor=${monitor})`);
         return [x, y, width, height, pid, name, monitor];
     }
 
-    // This is called before a window is shown. When the window matching pid
-    // and title is shown, it will be set to the given position and monitor.
-    PositionWindow(x, y, monitor, pid, title) {
+    // This is called before a window is shown. When a window matching pid
+    // is shown, it will be set to the given position and monitor. The client
+    // will typically create two windows, but both will have the same position
+    // and monitor so we don't need to distinguish between them as long as
+    // each one has its own handler.
+    PositionWindow(x, y, monitor, pid) {
         let handler_id = null
+        let timeout_id = null
+        console.log(`uk.co.realh.Hints: PositionWindow(x=${x}, y=${y}, ` +
+            `monitor=${monitor}, pid=${pid})`);
+        const timeout_cb = () => {
+            if (handler_id !== null) {
+                console.log("uk.co.realh.Hints: timeout waiting for window " +
+                    `from pid ${pid}`);
+                global.display.disconnect(handler_id);
+                handler_id = null;
+            }
+            timeout_id = null;
+        }
+        timeout_id = setTimeout(timeout_cb, 5000);
         handler_id = global.display.connect("window-created",
             (_display, window) => {
-                if (window.get_pid() !== pid || window.get_title() !== title) {
-                    return
+                const p = window.get_pid();
+                if (p != pid) {
+                    console.log(`uk.co.realh.Hints: ${p} != ${pid}`);
+                    return;
                 }
+                console.log(`uk.co.realh.Hints: ${p} == ${pid}`);
                 window.move(x, y);
                 window.set_monitor(monitor);
                 if (handler_id !== null) {
                     global.display.disconnect(handler_id);
                     handler_id = null;
+                }
+                if (timeout_id !== null) {
+                    clearTimeout(timeout_id);
+                    timeout_id = null;
                 }
             }
         );
