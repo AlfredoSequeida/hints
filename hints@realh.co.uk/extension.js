@@ -2,12 +2,16 @@ import Gio from 'gi://Gio';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 export default class HintsExtension extends Extension {
-    constructor() {
+    constructor(metadata) {
+        super(metadata);
         this._ownership = null;
         const f = Gio.File.new_for_path(`${this.path}/uk.co.realh.Hints.xml`);
-        const [contents, _] = f.load_contents(null);
+        const [_ok, contents, _etag] = f.load_contents(null);
         const decoder = new TextDecoder("utf-8");
         this.dbusSpec = decoder.decode(contents);
+        this.hintsService = new Hints();
+        this.exportedObject = Gio.DBusExportedObject.wrapJSObject(
+            this.dbusSpec, this.hintsService);
     }
 
     enable() {
@@ -23,19 +27,17 @@ export default class HintsExtension extends Extension {
 
     disable() {
         if (this._ownership) {
+            this.exportedObject.unexport();
             Gio.bus_unown_name(this._ownership);
             this._ownership = null;
         }
     }
 
-    onBusAcquired(_connection, _name) {
+    onBusAcquired(connection, _name) {
+        this.exportedObject.export(connection, "/uk/co/realh/Hints");
     }
 
-    onNameAcquired(connection, _name) {
-        const hintsService = new Hints();
-        const exportedObject = Gio.DBusExportedObject.wrapJSObject(
-            this.dbusSpec, hintsService);
-        exportedObject.export(connection, "/uk/co/realh/Hints");
+    onNameAcquired(_connection, _name) {
     }
 
     onNameLost(_connection, _name) {
@@ -50,6 +52,7 @@ class Hints {
     FocusedWindowInfo() {
         const w = global.display.get_focus_window();
         if (!w) {
+            console.log("uk.co.realh.Hints: no window focused");
             return [0, 0, 0, 0, -1, "", -1];
         }
         const {x, y, width, height} = w.get_frame_rect();
