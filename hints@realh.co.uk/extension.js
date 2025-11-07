@@ -71,39 +71,51 @@ class Hints {
     // and monitor so we don't need to distinguish between them as long as
     // each one has its own handler.
     PositionWindow(x, y, monitor, pid) {
-        let handler_id = null
+        let create_handler_id = null
         let timeout_id = null
+        let configure_handler_id = null
+
         console.log(`uk.co.realh.Hints: PositionWindow(x=${x}, y=${y}, ` +
             `monitor=${monitor}, pid=${pid})`);
+
         const timeout_cb = () => {
-            if (handler_id !== null) {
+            if (create_handler_id !== null) {
                 console.log("uk.co.realh.Hints: timeout waiting for window " +
                     `from pid ${pid}`);
-                global.display.disconnect(handler_id);
-                handler_id = null;
+                global.display.disconnect(create_handler_id);
+                create_handler_id = null;
             }
             timeout_id = null;
         }
-        timeout_id = setTimeout(timeout_cb, 5000);
-        handler_id = global.display.connect("window-created",
-            (_display, window) => {
-                const p = window.get_pid();
-                if (p != pid) {
-                    console.log(`uk.co.realh.Hints: ${p} != ${pid}`);
-                    return;
-                }
-                console.log(`uk.co.realh.Hints: ${p} == ${pid}`);
-                window.move_to_monitor(monitor);
-                window.move_frame(true, x, y);
-                if (handler_id !== null) {
-                    global.display.disconnect(handler_id);
-                    handler_id = null;
-                }
-                if (timeout_id !== null) {
-                    clearTimeout(timeout_id);
-                    timeout_id = null;
-                }
+
+        const configure_cb = (window, config) => {
+            console.log("uk.co.realh.Hints: configure signal received, " +
+                "moving to position ${x}, ${y}");
+            window.disconnect(configure_handler_id);
+            // window.move_to_monitor(monitor);
+            config.set_position(x, y);
+        }
+
+        const create_cb = (_display, window) => {
+            if (window.get_pid() !== pid) {
+                return;
             }
-        );
+
+            console.log(`uk.co.realh.Hints: Matched window with pid ${pid}`);
+
+            if (create_handler_id !== null) {
+                global.display.disconnect(create_handler_id);
+                create_handler_id = null;
+            }
+            if (timeout_id !== null) {
+                clearTimeout(timeout_id);
+                timeout_id = null;
+            }
+
+            configure_handler_id = window.connect('configure', configure_cb);
+        }
+
+        timeout_id = setTimeout(timeout_cb, 5000);
+        create_handler_id = global.display.connect("window-created", create_cb);
     }
 }
