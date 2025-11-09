@@ -40,7 +40,31 @@ class Mouse:
     This uses uinput to support both X11 and Wayland.
     """
 
-    def __init__(self, abs_max_width=10000, abs_max_height=10000, write_pause=0.03):
+    @staticmethod
+    def _get_visible_screen_rect(screen: Gdk.Screen) -> tuple[int, int, int, int]:
+        """Get the current screen size. See Issue #48
+
+        :return: The current screen size (min_x, min_y, max_x, max_y).
+        """
+        min_x, min_y, max_x, max_y = None, None, None, None
+        for monitor_index in range(screen.get_n_monitors()):
+            geometry = screen.get_monitor_geometry(monitor_index)
+            if min_x is None or geometry.x < min_x:
+                min_x = geometry.x
+            if min_y is None or geometry.y < min_y:
+                min_y = geometry.y
+            if max_x is None or geometry.x + geometry.width > max_x:
+                max_x = geometry.x + geometry.width
+            if max_y is None or geometry.y + geometry.height > max_y:
+                max_y = geometry.y + geometry.height
+
+        if min_x is None or min_y is None or max_x is None or max_y is None:
+            return (0, 0, 0, 0)
+        return (min_x, min_y, max_x, max_y)
+
+    def __init__(self, screen: Gdk.Screen, write_pause=0.03):
+
+        min_x, min_y, max_x, max_y = self._get_visible_screen_rect(screen)
 
         keys = [button.value for button in MouseButton]
         self.write_pause = write_pause
@@ -66,8 +90,8 @@ class Mouse:
                         ecodes.ABS_X,
                         AbsInfo(
                             value=0,
-                            min=0,
-                            max=abs_max_width,
+                            min=min_x,
+                            max=max_x,
                             fuzz=0,
                             flat=0,
                             resolution=0,
@@ -77,8 +101,8 @@ class Mouse:
                         ecodes.ABS_Y,
                         AbsInfo(
                             value=0,
-                            min=0,
-                            max=abs_max_height,
+                            min=min_y,
+                            max=max_y,
                             fuzz=0,
                             flat=0,
                             resolution=0,
@@ -229,7 +253,7 @@ class MouseService:
         Gtk.init()
 
         self.screen = Gdk.Screen.get_default()
-        self.mouse = Mouse(self.screen.get_width(), self.screen.get_height())
+        self.mouse = Mouse(screen=self.screen)
 
         if path.exists(UNIX_DOMAIN_SOCKET_FILE):
             remove(UNIX_DOMAIN_SOCKET_FILE)
@@ -255,7 +279,7 @@ class MouseService:
 
         :param screen: The screen object for the event.
         """
-        self.mouse = Mouse(screen.get_width(), screen.get_height())
+        self.mouse = Mouse(screen=self.screen)
 
     def socket_connection(self):
         """Handle socket connection events.
