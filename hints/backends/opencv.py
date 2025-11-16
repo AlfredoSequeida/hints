@@ -4,8 +4,8 @@ import logging
 from typing import TYPE_CHECKING
 
 import pyscreenshot as ImageGrab
-from cv2 import (CHAIN_APPROX_SIMPLE, COLOR_BGR2GRAY, RETR_LIST, Canny,
-                 boundingRect, cvtColor, dilate, findContours)
+from cv2 import (CHAIN_APPROX_SIMPLE, COLOR_BGR2GRAY, RETR_LIST, INTER_AREA,
+                Canny, boundingRect, cvtColor, dilate, findContours, resize)
 from numpy import array, ones, uint8
 
 from hints.backends.backend import HintsBackend
@@ -62,13 +62,23 @@ class OpenCV(HintsBackend):
                 # in sway, we need to exclude the top bar from the screenshot region
                 window_extents_offsets = (0, self.window_system.bar_height, 0, 0)
 
-        gray_image = cvtColor(
-            array(
+        image = array(
                 self.screenshot(
                     self.window_system.focused_window_extents,
                     window_extents_offsets=window_extents_offsets,
                 )
-            ),
+        )
+
+        # Resize the image to the size of the focused window,
+        # so hints are right-positioned
+        resized_image = resize(
+            image,
+            self.window_system.focused_window_extents[2:4],
+            interpolation=INTER_AREA,
+        )
+
+        gray_image = cvtColor(
+            resized_image,
             COLOR_BGR2GRAY,
         )
 
