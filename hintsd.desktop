@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Hints Daemon
+Comment=Starts the Hints mouse event daemon
+Exec=hintsd
+Type=Application
+Terminal=false
+Hidden=false

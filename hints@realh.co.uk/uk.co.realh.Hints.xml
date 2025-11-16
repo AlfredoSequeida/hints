@@ -1,0 +1,20 @@
+<!-- See extension.js for details -->
+<node>
+    <interface name="uk.co.realh.Hints">
+        <method name="FocusedWindowInfo">
+            <arg type="i" direction="out" name="x"/>
+            <arg type="i" direction="out" name="y"/>
+            <arg type="i" direction="out" name="width"/>
+            <arg type="i" direction="out" name="height"/>
+            <arg type="i" direction="out" name="pid"/>
+            <arg type="s" direction="out" name="name"/>
+            <arg type="i" direction="out" name="monitor"/>
+        </method>
+        <method name="PositionWindow">
+            <arg type="i" direction="in" name="x"/>
+            <arg type="i" direction="in" name="y"/>
+            <arg type="i" direction="in" name="monitor"/>
+            <arg type="i" direction="in" name="pid"/>
+        </method>
+    </interface>
+</node>

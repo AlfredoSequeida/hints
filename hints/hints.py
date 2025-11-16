@@ -79,7 +79,10 @@ def display_gtk_window(
         **(gtk_window_kwargs or {}),
     )
 
-    if window_system.window_system_type == WindowSystemType.WAYLAND:
+    if window_system.window_system_name == "gnome":
+        from hints.gnome_overlay import init_overlay_window
+        init_overlay_window(window, window_system, window_x_pos, window_y_pos)
+    elif window_system.window_system_type == WindowSystemType.WAYLAND:
         require_version("GtkLayerShell", "0.1")
         from gi.repository import GtkLayerShell
 
@@ -273,6 +276,8 @@ def get_window_system_class(
             from hints.window_systems.hyprland import Hyprland as window_system
         case "plasmashell":
             from hints.window_systems.plasmashell import Plasmashell as window_system
+        case "gnome-shell":
+            from hints.window_systems.gnome import Gnome as window_system
 
     return window_system
 
@@ -294,7 +299,7 @@ def get_window_system(window_system_id: str = "") -> Type[WindowSystem]:
         if window_system_type == WindowSystemType.WAYLAND:
 
             # add new waland wms here, then add a match case below to import the class
-            supported_wayland_wms = {"sway", "Hyprland", "plasmashell"}
+            supported_wayland_wms = {"sway", "Hyprland", "plasmashell", "gnome-shell"}
 
             # Check if there is a process running that matches the supported_wayland_wms
             window_system_id = (
@@ -373,3 +378,6 @@ def main():
                     == WindowSystemType.WAYLAND,
                 },
             )
+
+if __name__ == "__main__":
+    main()
