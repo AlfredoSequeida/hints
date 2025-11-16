@@ -2,5 +2,5 @@
     "name": "Hints",
     "description": "A GNOME Shell extension for Hints",
     "uuid": "hints@realh.co.uk",
-    "shell-version": [ "49" ]
+    "shell-version": [ "48", "49" ]
 }
