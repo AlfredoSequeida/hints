@@ -77,23 +77,17 @@ class Hints {
       }
     }
 
-    let rect, x, y, width, height;
-
     /* GTK 4 decorations behave differently that other toolkits in Mutter;
      * resulting in unexpected hint offsets. To resolve alignment issues,
      * we use get_frame_rect() for GTK 4 applications and get_buffer_rect() for
      * everything else.
      */
-    if (toolkit_name == "GTK" && +toolkit_version.split(".", 1) >= 4) {
-      rect = w.get_frame_rect();
-    } else {
-      rect = w.get_buffer_rect();
-    }
+    const rect =
+      toolkit_name == "GTK" && +toolkit_version.split(".", 1) >= 4
+        ? w.get_frame_rect()
+        : w.get_buffer_rect();
 
-    x = rect.x;
-    y = rect.y;
-    width = rect.width;
-    height = rect.height;
+    const { x, y, width, height } = rect;
 
     const name = w.get_wm_class();
     const monitor = w.get_monitor();
