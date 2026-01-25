@@ -82,12 +82,10 @@ class Hints {
      * we use get_frame_rect() for GTK 4 applications and get_buffer_rect() for
      * everything else.
      */
-    const rect =
+    const { x, y, width, height } =
       toolkit_name == "GTK" && +toolkit_version.split(".", 1) >= 4
         ? w.get_frame_rect()
         : w.get_buffer_rect();
-
-    const { x, y, width, height } = rect;
 
     const name = w.get_wm_class();
     const monitor = w.get_monitor();
