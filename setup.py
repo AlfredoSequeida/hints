@@ -74,10 +74,12 @@ class PostInstallCommand(install):
                 service_file.write(
                     "[Unit]\n"
                     "Description=Hints daemon\n"
+                    "StartLimitIntervalSec=0\n"
                     "[Service]\n"
                     "Type=simple\n"
                     f"ExecStart={bin_dir}/hintsd\n"
                     "Restart=always\n"
+                    "RestartSec=1s\n"
                     "[Install]\n"
                     "WantedBy=default.target\n"
                 )

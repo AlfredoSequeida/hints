@@ -127,9 +127,5 @@ class InterceptorWindow(Gtk.Window):
 
         :param window: Window object.
         """
-        while (
-            not self.is_wayland
-            and Gdk.keyboard_grab(window.get_window(), False, Gdk.CURRENT_TIME)
-            != Gdk.GrabStatus.SUCCESS
-        ):
-            pass
+        if not self.is_wayland:
+            Gdk.keyboard_grab(window.get_window(), False, Gdk.CURRENT_TIME)
