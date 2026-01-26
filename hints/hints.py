@@ -25,6 +25,7 @@ from hints.window_systems.window_system_type import (
     WindowSystemType,
     get_window_system_type,
 )
+from hints.setup import run_guided_setup
 
 if TYPE_CHECKING:
     from hints.child import Child
@@ -81,6 +82,7 @@ def display_gtk_window(
 
     if window_system.window_system_name == "gnome":
         from hints.gnome_overlay import init_overlay_window
+
         init_overlay_window(window, window_system, window_x_pos, window_y_pos)
     elif window_system.window_system_type == WindowSystemType.WAYLAND:
         require_version("GtkLayerShell", "0.1")
@@ -349,8 +351,15 @@ def main():
         " output of accessible elements (roles, states, application name, ect)"
         " for setting up configuration.",
     )
+    parser.add_argument(
+        "-s", "--setup", action="store_true", default=False, help="Guided hints setup."
+    )
 
     args = parser.parse_args()
+
+    if args.setup:
+        run_guided_setup()
+        exit()
 
     custom_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -378,6 +387,7 @@ def main():
                     == WindowSystemType.WAYLAND,
                 },
             )
+
 
 if __name__ == "__main__":
     main()

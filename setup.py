@@ -135,6 +135,7 @@ s = setup(
         "opencv-python",
         "evdev",
         "dbus-python",
+        "rich",
     ],
     entry_points={
         "console_scripts": [
