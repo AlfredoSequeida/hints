@@ -47,7 +47,7 @@ class PostInstallCommand(install):
 
         try:
             pipx_bin_dir_cmd = run(
-                ["pipx", "environment", "--value", "PIPX_BIN_DIR"],
+                ["uv", "tool", "dir", "--bin"],
                 check=True,
                 capture_output=True,
             )
