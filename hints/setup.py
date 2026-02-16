@@ -80,7 +80,8 @@ def setup_accessibility_variables() -> Changes:
 def setup_uinput_module() -> Changes:
     run(
         [
-            'sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf',
+            'sudo modprobe uinput && echo "uinput" | '
+            "sudo tee /etc/modules-load.d/uinput.conf > /dev/null",
         ],
         shell=True,
         check=True,
