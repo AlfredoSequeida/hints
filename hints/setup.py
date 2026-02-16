@@ -1,11 +1,13 @@
-from os import getuid, getenv
-from sys import exit as sys_exit
+from importlib.resources import as_file, files
+from os import getenv, getuid
 from pathlib import Path
 from subprocess import run
+from sys import exit as sys_exit
 from typing import Callable
+
 from rich import print
 from rich.tree import Tree
-from importlib.resources import as_file, files
+
 from hints.window_systems.window_system_type import (
     WindowSystemType,
     get_window_system_type,
@@ -75,7 +77,9 @@ def setup_accessibility_variables() -> Changes:
 
 
 @setup_function(
-    f"Create udev rules in {UDEV_RULES_FILE}, and add [bold]{USER}[/bold] to the [bold]input[/bold] group."
+    f"Create udev rules in {UDEV_RULES_FILE}, add [bold]{USER}[/bold] to the "
+    "[bold]input[/bold] group, and load the uinput module and set it to load"
+    " on boot."
 )
 def setup_udev_rules() -> Changes:
     UDEV_RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +93,17 @@ def setup_udev_rules() -> Changes:
 
     run(["sudo", "usermod", "-a", "-G", "input", USER], check=True)
 
-    changes.append(f"Added [bold]{USER}[/bold] to the [bold]input[/bold] group")
+    changes.append(f"Added [bold]{USER}[/bold] to the [bold]input[/bold] group.")
+
+    run(
+        [
+            'sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf',
+        ],
+        shell=True,
+        check=True,
+    )
+
+    changes.append("Loaded the uninput module and set it to load on boot.")
 
     return changes
 
