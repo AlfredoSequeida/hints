@@ -76,10 +76,22 @@ def setup_accessibility_variables() -> Changes:
         return changes
 
 
+@setup_function("Load the uinput module and set it to load on boot.")
+def setup_uinput_module() -> Changes:
+    run(
+        [
+            'sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf',
+        ],
+        shell=True,
+        check=True,
+    )
+
+    return ["Loaded the uninput module and set it to load on boot."]
+
+
 @setup_function(
     f"Create udev rules in {UDEV_RULES_FILE}, add [bold]{USER}[/bold] to the "
-    "[bold]input[/bold] group, and load the uinput module and set it to load"
-    " on boot."
+    "[bold]input[/bold] group."
 )
 def setup_udev_rules() -> Changes:
     UDEV_RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -94,16 +106,6 @@ def setup_udev_rules() -> Changes:
     run(["sudo", "usermod", "-a", "-G", "input", USER], check=True)
 
     changes.append(f"Added [bold]{USER}[/bold] to the [bold]input[/bold] group.")
-
-    run(
-        [
-            'sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf',
-        ],
-        shell=True,
-        check=True,
-    )
-
-    changes.append("Loaded the uninput module and set it to load on boot.")
 
     return changes
 
@@ -225,6 +227,7 @@ def run_guided_setup():
     else:
         setup_functions = [
             setup_accessibility_variables,
+            setup_uinput_module,
             setup_udev_rules,
             setup_hintsd,
         ]
