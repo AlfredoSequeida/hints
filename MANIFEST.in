@@ -1,1 +1,2 @@
 recursive-include hints/scripts *
+recursive-include hints/extensions *

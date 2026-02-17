@@ -4,8 +4,6 @@ from enum import Enum
 from os import getenv
 from typing import Literal
 
-from hints.window_systems.exceptions import CouldNotIdentifyWindowSystemType
-
 
 class WindowSystemType(Enum):
     """Window System types."""
@@ -23,10 +21,7 @@ def get_window_system_type() -> WindowSystemType:
     :return: the type of window system.
     """
 
-    xdg_session_type = getenv("XDG_SESSION_TYPE")
-
-    if not xdg_session_type:
-        raise CouldNotIdentifyWindowSystemType()
+    xdg_session_type = getenv("XDG_SESSION_TYPE", "")
 
     # x11 does not always report as "x11", so if it's not wayland, we assume x11.
     return (
