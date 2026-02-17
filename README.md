@@ -42,7 +42,7 @@ Don't like the keybindings? That's ok, you can change them.
 > 4. Cleans up leftover files.
 
 ```
-curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/feature/setup/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash
 ```
 
 ## Setup
