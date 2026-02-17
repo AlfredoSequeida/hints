@@ -10,8 +10,6 @@
   </a>
 </p>
 
-
-
 # Click, scroll, and drag with your keyboard
 
 ![demo](https://github.com/user-attachments/assets/838d4043-5e21-4e61-979f-bd8fae7d4d36)
@@ -22,7 +20,7 @@ Navigate GUIs without a mouse by typing hints in combination with modifier keys.
 - click multiple times (<kbd>2</kbd><kbd>j</kbd><kbd>k</kbd>)
 - right click (<kbd>SHIFT</kbd> + <kbd>j</kbd><kbd>k</kbd>)
 - drag (<kbd>ALT</kbd> + <kbd>j</kbd><kbd>k</kbd>)
-   - Note for wayland users: Due to how different wayland compositors handle overlay windows, dragging might not always work for your compositor.
+  - Note for wayland users: Due to how different wayland compositors handle overlay windows, dragging might not always work for your compositor.
 - hover (<kbd>CTRL</kbd> + <kbd>j</kbd><kbd>k</kbd>)
 - scroll/move the mouse using vim key bindings (<kbd>h</kbd>,<kbd>j</kbd>,<kbd>k</kbd>,<kbd>l</kbd>)
 
@@ -30,66 +28,41 @@ Don't like the keybindings? That's ok, you can change them.
 
 # Installing
 
-## System Requirements
+> [!IMPORTANT]
+>
+> - You need to have some sort of [compositing](https://wiki.archlinux.org/title/Xorg#Composite) setup so that you can properly see hints on top of windows with the correct level of transparency. If you run hints and see an opaque/black window rather than a transparent window with hints, this is probably why.
+>   Run the install script:
 
-1. You will need to have some sort of [compositing](https://wiki.archlinux.org/title/Xorg#Composite) setup so that you can properly overlay hints over windows with the correct level of transparency. Otherwise, the overlay will just cover the entire screen; not allowing you to see what is under the overlay.
-
-2. You will need to enable accessibility for your system. If you use a Desktop Environment, this might already be enabled by default. If you find that hints does not work or works for some apps and not others add the following to `/etc/environment`
-
-```
-ACCESSIBILITY_ENABLED=1
-GTK_MODULES=gail:atk-bridge
-OOO_FORCE_DESKTOP=gnome
-GNOME_ACCESSIBILITY=1
-QT_ACCESSIBILITY=1
-QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1
-```
-
-3. Hints comes with a daemon used to perform mouse actions. Without starting the daemon, you won't be able to perform mouse actions. If you are using the latest version of pipx (which will be installed below), everything should just work and you can skip this step. If you are not using the latest version of pipx or choose not to use pipx, you will need to set the `HINTS_EXPECTED_BIN_DIR` environment variable prior to installing hints. This path tells the `setup.py` script where hintsd is installed to properly create the service file. For example to use `$HOME/.local/bin` (the default for pipx), you can do `export HINTS_EXPECTED_BIN_DIR="$HOME/.local/bin"`.
-
-4. Below you will find installation instructions for some popular linux distros. The commands below assume that you're running wayland if your `XDG_SESSION_TYPE` variable is set to `wayland`. If that's the case you will install the wayland dependencies. Otherwise, the x11 dependencies will be installed. The setup is as follows:
-
-- Install the python/system dependencies (including [pipx](https://pipx.pypa.io/stable/installation/)).
-- Setup pipx.
-- Use pipx to install hints.
-
-Ubuntu
+> [!NOTE]  
+> The install script above does the following:
+>
+> 1. Installs any required system dependencies for Ubuntu, Arch, and Fedora systems. If you don't run any of those distros, you can look at the install script to see what you need to install.
+> 2. Temporarily installs [UV](https://docs.astral.sh/uv/).
+> 3. Uses [uv tool](https://docs.astral.sh/uv/guides/tools) to install the latest version of hints.
+> 4. Cleans up leftover files.
 
 ```
-sudo apt update && \
-    sudo apt install git libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-4.0 pipx cmake libdbus-1-dev && \
-    [ $XDG_SESSION_TYPE = "wayland" ] && sudo apt install gtk-layer-shell grim && \
-    pipx ensurepath && \
-    pipx install git+https://github.com/AlfredoSequeida/hints.git
+curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/feature/setup/install.sh | bash
 ```
-
-Fedora
-
-```
-sudo dnf install git gcc gobject-introspection-devel cairo-gobject-devel pkg-config python3-devel gtk4 pipx && \
-    [ $XDG_SESSION_TYPE = "wayland" ] && sudo dnf install gtk-layer-shell grim && \
-    pipx ensurepath && \
-    pipx install git+https://github.com/AlfredoSequeida/hints.git
-```
-
-Arch
-
-```
-sudo pacman -Sy && \
-    sudo pacman -S git python cairo pkgconf gobject-introspection gtk4 python-pipx && \
-    [ $XDG_SESSION_TYPE = "wayland" ] && sudo pacman -S gtk-layer-shell grim || sudo pacman -S libwnck3 && \
-    pipx ensurepath && \
-    pipx install git+https://github.com/AlfredoSequeida/hints.git
-```
-
-Finally, source your shell config or restart your terminal.
 
 ## Setup
 
-1. Follow the setup instructions for your window system [here](https://github.com/AlfredoSequeida/hints/wiki/Window-Manager-and-Desktop-Environment-Setup-Guide).
-2. Confirm that the uinput kernel module is loaded. If it is not 
-`sudo modprobe uinput && echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf`
-3. At this point, hints should be installed, you can verify this by running `hints` in your shell. If you still don't see any hints, the application you're testing could need a bit of extra setup. Please see the [Help,-hints-doesn't-work-with-X-application](https://github.com/AlfredoSequeida/hints/wiki/Help,-hints-doesn't-work-with-X-application) page in the wiki.
+1. To facilitate setup, hints ships with a setup script.
+
+To setup hints run:
+
+```
+sudo env XDG_SESSION_TYPE=$XDG_SESSION_TYPE env XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP $(whereis hints | awk '{print $2}') --setup
+```
+
+2. At this point you're pretty much done. You can verify this by running `hints` in a terminal emulator. However, you should bind hints to your keyboard so that you can summon hints on command. This is very desktop environment / window manager specific, but to get you started here are some examples for popular systems:
+
+- [i3/sway](https://github.com/AlfredoSequeida/hints/wiki/Window-Manager-and-Desktop-Environment-Setup-Guide#setup-keyboard-shortcuts-1)
+- [Hyprland](https://github.com/AlfredoSequeida/hints/wiki/Window-Manager-and-Desktop-Environment-Setup-Guide#setup-keyboard-shortcuts-3)
+- [Gnome](https://github.com/AlfredoSequeida/hints/wiki/Window-Manager-and-Desktop-Environment-Setup-Guide#setup-keyboard-shortcuts-4)
+
+> [!NOTE]  
+> If you still don't see any hints, the application you're testing could need a bit of extra setup. Please see the [Help,-hints-doesn't-work-with-X-application](https://github.com/AlfredoSequeida/hints/wiki/Help,-hints-doesn't-work-with-X-application) page in the wiki.
 
 # Documentation
 
@@ -115,7 +88,7 @@ python3 -m venv venv
 
 2. Activate your virtual environment for development. This will differ based on OS/shell. See the table [here](https://docs.python.org/3/library/venv.html#how-venvs-work) for instructions.
 
-3. Install hints as an editable package (from the repositorie's root directory):
+3. Install hints as an editable package (from the repository's root directory):
 
 ```
 pip install -e .

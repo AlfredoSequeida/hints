@@ -220,9 +220,17 @@ def run_guided_setup():
     """Guided setup to setup hints."""
     if not is_super_user():
         print(
-            "This command needs to run as super user."
-            " Try again with:\n\n"
-            "sudo --preserve-env=XDG_SESSION_TYPE $(whereis hints | awk '{print $2}') --setup\n"
+            "This command needs to run as super user. Try again with:\n\n"
+            + run(
+                [
+                    'echo "sudo env XDG_SESSION_TYPE=$XDG_SESSION_TYPE'
+                    " env XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP"
+                    " $(whereis hints | awk '{print $2}') --setup\""
+                ],
+                shell=True,
+                capture_output=True,
+                check=True,
+            ).stdout.decode("utf-8")
         )
         sys_exit(1)
     else:
