@@ -59,7 +59,7 @@ install_uv() {
 install_hints() {
   print_instruction_header "Installing hints."
 
-  HINTS_EXPECTED_BIN_DIR="$BIN_DIR" $UV_INSTALLATION_PATH/uv tool install --force git+https://github.com/AlfredoSequeida/hints@feature/setup
+  HINTS_EXPECTED_BIN_DIR="$BIN_DIR" $UV_INSTALLATION_PATH/uv tool install --force git+https://github.com/AlfredoSequeida/hints
   $UV_INSTALLATION_PATH/uv tool update-shell 
 }
 
