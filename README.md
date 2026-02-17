@@ -34,7 +34,7 @@ Don't like the keybindings? That's ok, you can change them.
 >   Run the install script:
 
 > [!NOTE]  
-> The install script above does the following:
+> The install script below does the following:
 >
 > 1. Installs any required system dependencies for Ubuntu, Arch, and Fedora systems. If you don't run any of those distros, you can look at the install script to see what you need to install.
 > 2. Temporarily installs [UV](https://docs.astral.sh/uv/).
