@@ -30,8 +30,7 @@ Don't like the keybindings? That's ok, you can change them.
 
 > [!IMPORTANT]
 >
-> - You need to have some sort of [compositing](https://wiki.archlinux.org/title/Xorg#Composite) setup so that you can properly see hints on top of windows with the correct level of transparency. If you run hints and see an opaque/black window rather than a transparent window with hints, this is probably why.
->   Run the install script:
+> - You need to have some sort of [compositing](https://wiki.archlinux.org/title/Xorg#Composite) setup so that you can properly see hints on top of windows with the correct level of transparency. If you run hints and see an opaque/black window rather than a transparent window; this is probably why.
 
 > [!NOTE]  
 > The install script below does the following:
@@ -40,6 +39,8 @@ Don't like the keybindings? That's ok, you can change them.
 > 2. Temporarily installs [UV](https://docs.astral.sh/uv/).
 > 3. Uses [uv tool](https://docs.astral.sh/uv/guides/tools) to install the latest version of hints.
 > 4. Cleans up leftover files.
+
+Run the install script:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash
