@@ -6,7 +6,6 @@ from sys import exit as sys_exit
 from typing import Callable
 
 from rich import print
-from rich.tree import Tree
 
 from hints.window_systems.window_system_type import (
     WindowSystemType,
@@ -19,8 +18,6 @@ USER = getenv("SUDO_USER", "$SUDO_USER")
 
 Changes = list[str] | None
 SetupFunction = Callable[..., Changes]
-
-tree = Tree("\nChanges")
 
 
 def setup_function(setup_description: str, post_setup_instruction: str = ""):
@@ -219,9 +216,9 @@ def reboot():
 def run_guided_setup():
     """Guided setup to setup hints."""
     if not is_super_user():
-        print(
-            "This command needs to run as super user. Try again with:\n\n"
-            + run(
+
+        setup_command = (
+            run(
                 [
                     'echo "sudo env XDG_SESSION_TYPE=$XDG_SESSION_TYPE'
                     " env XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP"
@@ -230,8 +227,15 @@ def run_guided_setup():
                 shell=True,
                 capture_output=True,
                 check=True,
-            ).stdout.decode("utf-8")
+            )
+            .stdout.decode("utf-8")
+            .strip()
         )
+
+        print("This command needs to run as super user. Try again with:\n")
+        print(setup_command)
+        print()
+
         sys_exit(1)
     else:
         setup_functions = [
