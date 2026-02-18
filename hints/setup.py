@@ -115,7 +115,7 @@ def setup_hintsd() -> Changes:
 
     for cmd in systemctl_cmds:
         run(["systemctl", f"--machine={USER}@.host", "--user"] + cmd, check=True)
-        changes.append(f"systemctl {(" ").join(cmd)}")
+        changes.append(f"systemctl {(' ').join(cmd)}")
 
     return changes
 
