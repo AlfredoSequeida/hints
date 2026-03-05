@@ -1,0 +1,12 @@
+# Runtime dependencies — mirrors install_requires in setup.py.
+# Kept in sync manually; used by pip-audit for local dependency scanning.
+#
+# PyGObject is intentionally excluded: it requires gobject-introspection system
+# headers to build metadata, which are not universally available. It is covered
+# by pip-audit in CI where system libs are installed explicitly.
+pillow
+pyscreenshot
+opencv-python
+evdev
+dbus-python
+rich

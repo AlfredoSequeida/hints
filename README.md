@@ -97,6 +97,42 @@ pip install -e .
 
 At this point, hints should be installed locally in the virtual environment, you can run `hints` in your shell to launch it. Any edits you make to the source code will automatically update the installation. For future development work, you can simply re-enable the virtual environment (step 2).
 
+## Pre-commit validation
+
+hints uses [pre-commit](https://pre-commit.com) to run security checks locally before each commit:
+
+- **bandit** — static analysis (SAST) for Python security issues, runs on staged files.
+- **pip-audit** — dependency vulnerability scan against the [OSV database](https://osv.dev), runs against `requirements.txt`.
+
+### Setup
+
+4. Install pre-commit:
+
+```
+pip install pre-commit
+```
+
+5. Install pip-audit:
+
+```
+pip install pip-audit
+```
+
+6. Install the git hooks:
+
+```
+pre-commit install
+```
+
+The hooks will now run automatically on every `git commit`. You can also run them manually at any time:
+
+```
+pre-commit run --all-files
+```
+
+> [!NOTE]
+> `PyGObject` is excluded from `requirements.txt` used by pip-audit because it requires `gobject-introspection` system headers to build package metadata, which are not universally available. It is covered by pip-audit in CI.
+
 ## Development tips
 
 - If you are making updates that impact hints, you will most likely need to test displaying hints and might find yourself executing hints but not being quick enough to switch to a window to see hints. To get around this, you can execute `hints` with a short pause in your shell: `sleep 0.5; hints`. This way you can have time to switch to a window and see any errors / logs in your shell.
