@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        name: bandit (security linter)
+        args: ["-r", "-ll"]
+        # -r recursive, -ll report medium+ severity
+        # pip-audit is intentionally omitted: installing this project
+        # requires system libs (libgirepository, Cairo) unavailable in
+        # pre-commit's isolated environment. It runs in CI instead.
