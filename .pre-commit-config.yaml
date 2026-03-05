@@ -6,6 +6,19 @@ repos:
         name: bandit (security linter)
         args: ["-r", "-ll"]
         # -r recursive, -ll report medium+ severity
-        # pip-audit is intentionally omitted: installing this project
-        # requires system libs (libgirepository, Cairo) unavailable in
-        # pre-commit's isolated environment. It runs in CI instead.
+
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: pip-audit (dependency scan)
+        language: system
+        entry: pip-audit
+        args: ["-r", "requirements.txt", "--no-deps"]
+        pass_filenames: false
+        # language: system uses the system Python, giving pip access to system
+        # libs (libgirepository, Cairo) needed to build PyGObject metadata.
+        # --no-deps checks only direct dependencies from requirements.txt
+        # (which mirrors install_requires in setup.py), not transitive deps.
+        # Transitive dependency CVEs are caught by pip-audit in CI where the
+        # full project is installed in a clean runner with system libs present.
+        # Requires pip-audit in the active environment: pip install pip-audit
