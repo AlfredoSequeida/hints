@@ -296,6 +296,8 @@ class AtspiBackend(HintsBackend):
                 continue
             for window_index in range(window.get_child_count()):
                 current_window = window.get_child_at_index(window_index)
+                if current_window is None:
+                    continue
                 # Some hidden windows that are minimized to status trays
                 # (like discord) will still have the Atspi.StateType.Active
                 # state, so the pid from the window manger allows us to filter
