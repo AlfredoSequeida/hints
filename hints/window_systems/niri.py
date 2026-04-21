@@ -47,31 +47,21 @@ class Niri(WindowSystem):
         output_logical = self._focused_output["logical"]
         layout = self._focused_window["layout"]
 
-        width = layout["window_size"][0]
-        height = layout["window_size"][1]
-
         tile_pos = layout.get("tile_pos_in_workspace_view")
         if tile_pos is not None:
+            # Floating windows: niri populates tile_pos_in_workspace_view
             x = output_logical["x"] + int(tile_pos[0])
             y = output_logical["y"] + int(tile_pos[1])
+            width = layout["window_size"][0]
+            height = layout["window_size"][1]
         else:
-            # tile_pos_in_workspace_view can be null when the window is
-            # the only visible column. Derive position from the output
-            # geometry and tile/window offsets.
-            tile_w = layout["tile_size"][0]
-            offset_x = layout["window_offset_in_tile"][0]
-            offset_y = layout["window_offset_in_tile"][1]
-
-            # Center the tile horizontally within the output (niri's default
-            # behavior for a single focused column).
-            x = output_logical["x"] + int(
-                (output_logical["width"] - tile_w) / 2 + offset_x
-            )
-
-            # Vertical: the bar (if any) takes the space that the tile
-            # doesn't occupy. Assume the strut is at the top.
-            bar_height = output_logical["height"] - int(layout["tile_size"][1])
-            y = output_logical["y"] + bar_height + int(offset_y)
+            # Tiled windows: niri IPC does not expose the screen position
+            # (https://github.com/niri-wm/niri/issues/2381). Fall back to
+            # the full output geometry so hints still scans the screen.
+            x = output_logical["x"]
+            y = output_logical["y"]
+            width = output_logical["width"]
+            height = output_logical["height"]
 
         return (x, y, width, height)
 
