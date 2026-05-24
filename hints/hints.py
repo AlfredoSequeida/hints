@@ -280,6 +280,10 @@ def get_window_system_class(
             from hints.window_systems.plasmashell import Plasmashell as window_system
         case "gnome-shell":
             from hints.window_systems.gnome import Gnome as window_system
+        case "niri":
+            from hints.window_systems.niri import Niri as window_system
+        case "mango":
+            from hints.window_systems.mango import Mango as window_system
 
     return window_system
 
@@ -301,7 +305,7 @@ def get_window_system(window_system_id: str = "") -> Type[WindowSystem]:
         if window_system_type == WindowSystemType.WAYLAND:
 
             # add new waland wms here, then add a match case below to import the class
-            supported_wayland_wms = {"sway", "Hyprland", "plasmashell", "gnome-shell"}
+            supported_wayland_wms = {"sway", "Hyprland", "plasmashell", "gnome-shell", "niri", "mango"}
 
             # Check if there is a process running that matches the supported_wayland_wms
             window_system_id = (
