@@ -301,7 +301,10 @@ class AtspiBackend(HintsBackend):
 
         :return: Atspi focused window / accessible root element.
         """
+        focused_pid = self.window_system.focused_window_pid
         desktop = Atspi.get_desktop(0)
+        pid_match: Atspi.Accessible | None = None
+
         for app_index in range(desktop.get_child_count()):
             window = desktop.get_child_at_index(app_index)
             # Gnome creates a mutter application that is also focused.
@@ -312,18 +315,21 @@ class AtspiBackend(HintsBackend):
                 current_window = window.get_child_at_index(window_index)
                 if current_window is None:
                     continue
+                if current_window.get_process_id() != focused_pid:
+                    continue
                 # Some hidden windows that are minimized to status trays
                 # (like discord) will still have the Atspi.StateType.Active
                 # state, so the pid from the window manger allows us to filter
-                # out such applications.
-                if (
-                    current_window.get_state_set().contains(Atspi.StateType.ACTIVE)
-                    and current_window.get_process_id()
-                    == self.window_system.focused_window_pid
-                ):
+                # out such applications. Prefer the window that AT-SPI marks
+                # ACTIVE; fall back to the first PID match for apps (e.g.
+                # Firefox on i3) that don't reliably update ACTIVE state when
+                # focus changes via a WM keybinding.
+                if current_window.get_state_set().contains(Atspi.StateType.ACTIVE):
                     return current_window
+                if pid_match is None:
+                    pid_match = current_window
 
-        return None
+        return pid_match
 
     def get_children(
         self,
