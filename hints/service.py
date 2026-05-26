@@ -1,10 +1,16 @@
-"""Mouse service for hints.
+"""hintsd: the long-running hints daemon.
 
-This service is an independent application that hints calls using a Unix
-Domain Socket to perform mouse movements by writing to uinput. We use
-custom uinput devices to support X11 and Wayland. This is separate from
-the main hints application to prevent slowing down the main hints
-process when creating virutal devices.
+This service runs in the background and hints clients talk to it over a
+Unix Domain Socket. It is responsible for:
+
+- Performing mouse actions (click/move/scroll) by writing to custom uinput
+  devices, which works on both X11 and Wayland.
+- Gathering hints and displaying the hint overlay for the focused window
+  (the ``show_hints`` request), so the per-press cost of importing
+  GTK/AT-SPI/Wnck is paid once at startup rather than on every invocation.
+
+Keeping this work in a warm, always-running process is what makes summoning
+hints fast.
 """
 
 from __future__ import annotations
@@ -67,7 +73,7 @@ class _DaemonMouse:
         return self._mouse.do_mouse_action(key_press_state, key, mode.value)
 
 
-MOUSE_SERVICE_LOOP_MS_INTERVAL = 10
+SERVICE_LOOP_MS_INTERVAL = 10
 config = load_config()
 
 
@@ -254,15 +260,17 @@ class Mouse:
         return key_press_state
 
 
-class MouseService:
-    """Mouse Service.
+class HintsService:
+    """Hints daemon.
 
-    This is responsible for running the mouse service and detecting
-    events requring the mouse devices to reload / be updated.
+    Runs the background service that clients talk to over the Unix Domain
+    Socket: performs mouse actions, gathers hints, and displays the hint
+    overlay. Also detects events requiring the mouse devices to reload / be
+    updated.
     """
 
     def __init__(self):
-        """Mouse Service Constructor."""
+        """Hints service constructor."""
         Gtk.init()
 
         self.screen = Gdk.Screen.get_default()
@@ -310,7 +318,7 @@ class MouseService:
         )
         self.socket.bind(UNIX_DOMAIN_SOCKET_FILE)
         self.socket.listen(1)
-        GLib.timeout_add(MOUSE_SERVICE_LOOP_MS_INTERVAL, self.socket_connection)
+        GLib.timeout_add(SERVICE_LOOP_MS_INTERVAL, self.socket_connection)
 
         self.screen.connect("size-changed", self.on_size_changed)
         signal(SIGINT, self.on_interrupt)
@@ -331,8 +339,7 @@ class MouseService:
     def socket_connection(self):
         """Handle socket connection events.
 
-        This is how the main hints process and the mouse service
-        communicate.
+        This is how hints clients and the hintsd service communicate.
         """
         try:
             connection, _ = self.socket.accept()
@@ -454,7 +461,7 @@ class MouseService:
         # on. The overlay guard stays set until the action completes so a new
         # trigger can't race an in-flight action.
         GLib.timeout_add(
-            MOUSE_SERVICE_LOOP_MS_INTERVAL,
+            SERVICE_LOOP_MS_INTERVAL,
             self._perform_mouse_action,
             mouse_action,
             window_system,
@@ -545,19 +552,19 @@ class MouseService:
         self._overlay_active = False
 
     def run(self):
-        """Run the mouse service."""
+        """Run the hints daemon."""
         Gtk.main()
 
 
 def main():
-    """Mouse service entry point."""
+    """hintsd entry point."""
     # Quiet by default; set HINTS_DEBUG=1 to surface hint timing and debug
     # logs in the journal for troubleshooting.
     logging.basicConfig(
         level=logging.DEBUG if getenv("HINTS_DEBUG") else logging.WARNING,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    MouseService().run()
+    HintsService().run()
 
 
 if __name__ == "__main__":
