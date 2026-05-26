@@ -77,6 +77,22 @@ SERVICE_LOOP_MS_INTERVAL = 10
 config = load_config()
 
 
+def _virtual_screen_size() -> tuple[int, int]:
+    """Size of the full virtual desktop (bounding box of all monitors).
+
+    Replaces the deprecated Gdk.Screen.get_width/get_height. Used to bound the
+    absolute uinput device so absolute positions map across all monitors.
+    """
+    display = Gdk.Display.get_default()
+    width = 0
+    height = 0
+    for index in range(display.get_n_monitors()):
+        geometry = display.get_monitor(index).get_geometry()
+        width = max(width, geometry.x + geometry.width)
+        height = max(height, geometry.y + geometry.height)
+    return width, height
+
+
 class Mouse:
     """Mouse class for performing mouse actions (click, hover, move, etc).
 
@@ -274,7 +290,7 @@ class HintsService:
         Gtk.init()
 
         self.screen = Gdk.Screen.get_default()
-        self.mouse = Mouse(self.screen.get_width(), self.screen.get_height())
+        self.mouse = Mouse(*_virtual_screen_size())
 
         # Hint overlay state. Only one overlay may be active at a time.
         self._overlay_active = False
@@ -334,7 +350,7 @@ class HintsService:
 
         :param screen: The screen object for the event.
         """
-        self.mouse = Mouse(screen.get_width(), screen.get_height())
+        self.mouse = Mouse(*_virtual_screen_size())
 
     def socket_connection(self):
         """Handle socket connection events.
@@ -442,15 +458,15 @@ class HintsService:
         window_system = self._window_system
         self._overlay_window = None
 
-        # On X11 the overlay grabbed the keyboard via Gdk.keyboard_grab; release
-        # it defensively in case the overlay exited without selecting a hint. On
+        # On X11 the overlay grabbed the keyboard via the seat; release it
+        # defensively in case the overlay exited without selecting a hint. On
         # Wayland the grab is owned by GtkLayerShell (KeyboardMode.EXCLUSIVE) and
         # is released when the surface is destroyed, so no explicit ungrab.
         if (
             window_system is not None
             and window_system.window_system_type != WindowSystemType.WAYLAND
         ):
-            Gdk.keyboard_ungrab(Gdk.CURRENT_TIME)
+            Gdk.Display.get_default().get_default_seat().ungrab()
 
         if not mouse_action:
             self._overlay_active = False

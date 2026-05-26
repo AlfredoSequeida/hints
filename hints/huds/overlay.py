@@ -283,7 +283,8 @@ class OverlayWindow(Gtk.Window):
         self.update_hints(hint_chr)
 
         if len(self.hints) == 1:
-            Gdk.keyboard_ungrab(event.time)
+            if not self.is_wayland:
+                Gdk.Display.get_default().get_default_seat().ungrab()
             x, y = self.hints[self.hint_selector_state].absolute_position
             x_offset, y_offset = self.hints_drawn_offsets[self.hint_selector_state]
             self.mouse_action.update(
@@ -308,12 +309,21 @@ class OverlayWindow(Gtk.Window):
         :param window: Gtk Window object.
         """
 
-        while (
-            not self.is_wayland
-            and Gdk.keyboard_grab(window.get_window(), False, Gdk.CURRENT_TIME)
-            != Gdk.GrabStatus.SUCCESS
-        ):
-            pass
+        if not self.is_wayland:
+            seat = Gdk.Display.get_default().get_default_seat()
+            gdk_window = window.get_window()
+            while (
+                seat.grab(
+                    gdk_window,
+                    Gdk.SeatCapabilities.KEYBOARD,
+                    False,
+                    None,
+                    None,
+                    None,
+                )
+                != Gdk.GrabStatus.SUCCESS
+            ):
+                pass
 
         Gdk.Window.set_cursor(
             self.get_window(),  # Gdk Window object

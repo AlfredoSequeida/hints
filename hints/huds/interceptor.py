@@ -152,4 +152,12 @@ class InterceptorWindow(Gtk.Window):
         :param window: Window object.
         """
         if not self.is_wayland:
-            Gdk.keyboard_grab(window.get_window(), False, Gdk.CURRENT_TIME)
+            seat = Gdk.Display.get_default().get_default_seat()
+            seat.grab(
+                window.get_window(),
+                Gdk.SeatCapabilities.KEYBOARD,
+                False,
+                None,
+                None,
+                None,
+            )
