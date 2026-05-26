@@ -179,7 +179,7 @@ class OverlayWindow(Gtk.Window):
         self.hover_modifier = config["hover_modifier"]
         self.grab_modifier = config["grab_modifier"]
 
-        self.set_default_size(width, height)
+        self.resize(width, height)
         self.move(x_pos, y_pos)
         self.drawing_area.queue_draw()
 
