@@ -310,6 +310,24 @@ class HintsService:
         except Exception:  # pylint: disable=broad-except
             logger.debug("AT-SPI warm-up failed", exc_info=True)
 
+        # Warm the Cairo font stack so the first hint render doesn't pay the
+        # Freetype/Fontconfig cold-start cost. cairo.ImageSurface is in-memory
+        # (no window needed) and its font cache is process-global.
+        try:
+            import cairo as _cairo
+
+            _surf = _cairo.ImageSurface(_cairo.FORMAT_ARGB32, 1, 1)
+            _cr = _cairo.Context(_surf)
+            _cr.select_font_face(
+                config.get("hints", {}).get("hint_font_face", "monospace"),
+                _cairo.FONT_SLANT_NORMAL,
+                _cairo.FONT_WEIGHT_BOLD,
+            )
+            _cr.set_font_size(config.get("hints", {}).get("hint_font_size", 12))
+            _cr.text_extents("ab")
+        except Exception:  # pylint: disable=broad-except
+            logger.debug("Cairo font pre-warm failed", exc_info=True)
+
         # Optionally preload the opencv fallback backend so the first
         # opencv-backed hint does not pay the heavy cv2/numpy/pyscreenshot
         # import. Off by default: opencv is a fallback many users never
@@ -417,23 +435,40 @@ class HintsService:
         self._window_extents = window_extents
         self._config = current_config
 
+        window_x = x + current_config["overlay_x_offset"]
+        window_y = y + current_config["overlay_y_offset"]
+
         try:
-            self._overlay_window = create_gtk_window(
-                window_system,
-                OverlayWindow,
-                x,
-                y,
-                width,
-                height,
-                gkt_window_args=(current_config, hints, self._mouse_action),
-                gtk_window_kwargs={
-                    "is_wayland": is_wayland,
-                    "launch_time": launch_time,
-                    "on_complete": self._on_hints_complete,
-                },
-                overlay_x_offset=current_config["overlay_x_offset"],
-                overlay_y_offset=current_config["overlay_y_offset"],
-            )
+            if self._overlay_window is None:
+                self._overlay_window = create_gtk_window(
+                    window_system,
+                    OverlayWindow,
+                    x,
+                    y,
+                    width,
+                    height,
+                    gkt_window_args=(current_config, hints, self._mouse_action),
+                    gtk_window_kwargs={
+                        "is_wayland": is_wayland,
+                        "launch_time": launch_time,
+                        "on_complete": self._on_hints_complete,
+                    },
+                    overlay_x_offset=current_config["overlay_x_offset"],
+                    overlay_y_offset=current_config["overlay_y_offset"],
+                )
+            else:
+                self._overlay_window.reset(
+                    window_x,
+                    window_y,
+                    width,
+                    height,
+                    current_config,
+                    hints,
+                    self._mouse_action,
+                    launch_time=launch_time,
+                )
+                self._reposition_overlay(window_system, window_x, window_y, is_wayland)
+                self._overlay_window.show_all()
         except Exception:  # pylint: disable=broad-except
             # Never leave the guard stuck on if the overlay fails to build or
             # show, otherwise no further hints could be triggered.
@@ -444,10 +479,50 @@ class HintsService:
 
         return {"status": "ok"}
 
-    def _on_hints_complete(self):
-        """Tear down the overlay and schedule the selected mouse action.
+    def _reposition_overlay(
+        self, window_system, window_x: int, window_y: int, is_wayland: bool
+    ):
+        """Update platform-specific positioning when reusing the overlay window.
 
-        Called from the overlay's destroy handler. The mouse action is NOT
+        On X11, OverlayWindow.reset() already called move() so nothing to do.
+        On Wayland, the layer-shell surface is recreated on each show, so we
+        re-apply monitor and margins before show_all(). For GNOME the DBus
+        position call updates the extension's placement.
+
+        :param window_system: The window system for the current trigger.
+        :param window_x: Absolute X position (including overlay offset).
+        :param window_y: Absolute Y position (including overlay offset).
+        :param is_wayland: Whether the session is Wayland.
+        """
+        window = self._overlay_window
+        if window_system.window_system_name == "gnome":
+            from hints.gnome_overlay import init_overlay_window
+
+            init_overlay_window(window, window_system, window_x, window_y)
+        elif is_wayland:
+            require_version("GtkLayerShell", "0.1")
+            from gi.repository import GtkLayerShell
+
+            expected_monitor = Gdk.Display.get_monitor_at_point(
+                Gdk.Display.get_default(), window_x, window_y
+            )
+            expected_monitor_geometry = expected_monitor.get_geometry()
+            GtkLayerShell.set_monitor(window, expected_monitor)
+            GtkLayerShell.set_margin(
+                window,
+                GtkLayerShell.Edge.LEFT,
+                window_x - expected_monitor_geometry.x,
+            )
+            GtkLayerShell.set_margin(
+                window,
+                GtkLayerShell.Edge.TOP,
+                window_y - expected_monitor_geometry.y,
+            )
+
+    def _on_hints_complete(self):
+        """Hide the overlay and schedule the selected mouse action.
+
+        Called from the overlay's _finish() method. The mouse action is NOT
         performed here: doing so synchronously fires the click while the
         overlay surface is still mapped over the target window (on Wayland
         the click then lands on the layer-shell surface, not the app). It is
@@ -456,7 +531,7 @@ class HintsService:
         """
         mouse_action = self._mouse_action
         window_system = self._window_system
-        self._overlay_window = None
+        # Keep self._overlay_window alive for reuse on the next trigger.
 
         # On X11 the overlay grabbed the keyboard via the seat; release it
         # defensively in case the overlay exited without selecting a hint. On
