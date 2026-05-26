@@ -13,6 +13,7 @@ from gi.repository import Atspi
 from hints.backends.backend import HintsBackend
 from hints.backends.exceptions import AccessibleChildrenNotFoundError
 from hints.child import Child
+from hints.constants import ELEMENT_DETAIL_LOG_LEVEL
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class AtspiBackend(HintsBackend):
         self.toolkit = ""
         self.toolkit_version = ""
         self.scale_factor = 1
+        self._window_extents: tuple[int, int, int, int] | None = None
 
     def get_relative_and_absolute_extents(
         self, root: Atspi.Accessible
@@ -48,7 +50,7 @@ class AtspiBackend(HintsBackend):
         :param root: Accessible element to get extents for.
         :return: absolute_position, relative_position, and extents.
         """
-        start_x, start_y, _, _ = self.window_system.focused_window_extents
+        start_x, start_y, _, _ = self._window_extents
 
         # GTK4 and Wayland do not support absolute positioning, so we work off relative positions
         if self.window_system.window_system_type == WindowSystemType.WAYLAND or (
@@ -179,15 +181,21 @@ class AtspiBackend(HintsBackend):
             if (
                 self.validate_match_conditions(root, "state")
                 and self.validate_match_conditions(root, "role")
-                and self.window_system.focused_window_extents
+                and self._window_extents
             ):
-                logger.debug(
-                    "Accessible element matched. Name: %s, ID: %d",
-                    root.name,
-                    root.get_id(),
-                )
-                logger.debug("role: %s", root.get_role())
-                logger.debug("states: %s", root.get_state_set().get_states())
+                if logger.isEnabledFor(ELEMENT_DETAIL_LOG_LEVEL):
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "Accessible element matched. Name: %s, ID: %d",
+                        root.name,
+                        root.get_id(),
+                    )
+                    logger.log(ELEMENT_DETAIL_LOG_LEVEL, "role: %s", root.get_role())
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "states: %s",
+                        root.get_state_set().get_states(),
+                    )
 
                 children.append(
                     Child(
@@ -239,7 +247,7 @@ class AtspiBackend(HintsBackend):
 
         collection = root.get_collection_iface()
 
-        if collection and self.window_system.focused_window_extents:
+        if collection and self._window_extents:
             matches = collection.get_matches(
                 match_rule, Atspi.CollectionSortOrder.CANONICAL, 0, True
             )
@@ -254,13 +262,19 @@ class AtspiBackend(HintsBackend):
                 if relative_position[0] < 0 or relative_position[1] < 0:
                     continue
 
-                logger.debug(
-                    "Accessible element matched. Name: %s, ID: %d",
-                    match.name,
-                    match.get_id(),
-                )
-                logger.debug("role: %s", match.get_role())
-                logger.debug("states: %s", match.get_state_set().get_states())
+                if logger.isEnabledFor(ELEMENT_DETAIL_LOG_LEVEL):
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "Accessible element matched. Name: %s, ID: %d",
+                        match.name,
+                        match.get_id(),
+                    )
+                    logger.log(ELEMENT_DETAIL_LOG_LEVEL, "role: %s", match.get_role())
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "states: %s",
+                        match.get_state_set().get_states(),
+                    )
 
                 children.append(
                     Child(
@@ -320,6 +334,11 @@ class AtspiBackend(HintsBackend):
             centered children coordinates.
         """
         children: list[Child] = []
+
+        # The focused window cannot move while hints are gathered synchronously,
+        # so resolve its extents once instead of per element.
+        self._window_extents = self.window_system.focused_window_extents
+
         window = self.get_atspi_active_window()
 
         if window:
