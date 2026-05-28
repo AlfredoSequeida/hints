@@ -304,6 +304,7 @@ class AtspiBackend(HintsBackend):
         focused_pid = self.window_system.focused_window_pid
         desktop = Atspi.get_desktop(0)
         pid_match: Atspi.Accessible | None = None
+        is_x11 = self.window_system.window_system_type == WindowSystemType.X11
 
         for app_index in range(desktop.get_child_count()):
             window = desktop.get_child_at_index(app_index)
@@ -317,15 +318,34 @@ class AtspiBackend(HintsBackend):
                     continue
                 if current_window.get_process_id() != focused_pid:
                     continue
-                # Some hidden windows that are minimized to status trays
-                # (like discord) will still have the Atspi.StateType.Active
-                # state, so the pid from the window manger allows us to filter
-                # out such applications. Prefer the window that AT-SPI marks
-                # ACTIVE; fall back to the first PID match for apps (e.g.
-                # Firefox on i3) that don't reliably update ACTIVE state when
-                # focus changes via a WM keybinding.
-                if current_window.get_state_set().contains(Atspi.StateType.ACTIVE):
-                    return current_window
+                if is_x11 and self._window_extents:
+                    # On X11, get_extents() makes a live D-Bus call so the
+                    # result is always fresh. This correctly identifies the
+                    # focused window among multiple windows sharing the same
+                    # PID (e.g. two Firefox windows), where ACTIVE state is
+                    # unreliable.
+                    extents = current_window.get_extents(Atspi.CoordType.SCREEN)
+                    wx, wy, _, _ = self._window_extents
+                    logger.debug(
+                        "Window '%s': atspi extents=(%d,%d) wm extents=(%d,%d)",
+                        current_window.get_name(),
+                        extents.x,
+                        extents.y,
+                        wx,
+                        wy,
+                    )
+                    if extents.x == wx and extents.y == wy:
+                        return current_window
+                else:
+                    # Some hidden windows that are minimized to status trays
+                    # (like discord) will still have the Atspi.StateType.Active
+                    # state, so the pid from the window manger allows us to filter
+                    # out such applications. Prefer the window that AT-SPI marks
+                    # ACTIVE; fall back to the first PID match for apps (e.g.
+                    # Firefox on i3) that don't reliably update ACTIVE state when
+                    # focus changes via a WM keybinding.
+                    if current_window.get_state_set().contains(Atspi.StateType.ACTIVE):
+                        return current_window
                 if pid_match is None:
                     pid_match = current_window
 
