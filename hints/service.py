@@ -303,11 +303,16 @@ class HintsService:
         # In-process mouse interface for the interceptor (avoids socket deadlock).
         self._mouse_adapter = _DaemonMouse(self.mouse)
 
-        # Warm the AT-SPI connection so the first hint trigger does not pay
-        # the registry/connection setup cost.
+        # Warm the AT-SPI connection and register a window:activate listener so
+        # the active accessible is always cached before a hint trigger arrives.
+        # This avoids the need to search the AT-SPI tree on every invocation.
+        self._atspi_active_accessible: Atspi.Accessible | None = None
         try:
             Atspi.get_desktop(0)
+            self._atspi_listener = Atspi.EventListener.new(self._on_window_activate)
+            self._atspi_listener.register("window:activate")
         except Exception:  # pylint: disable=broad-except
+            self._atspi_listener = None
             logger.debug("AT-SPI warm-up failed", exc_info=True)
 
         # Warm the Cairo font stack so the first hint render doesn't pay the
@@ -356,6 +361,10 @@ class HintsService:
 
         self.screen.connect("size-changed", self.on_size_changed)
         signal(SIGINT, self.on_interrupt)
+
+    def _on_window_activate(self, event: Atspi.Event):
+        """Cache the accessible window that just became active."""
+        self._atspi_active_accessible = event.source
 
     def on_interrupt(self, *_):
         """Interrupt handler to clean up."""
@@ -419,7 +428,9 @@ class HintsService:
             # restarting the daemon.
             current_config = load_config()
             window_system = get_window_system(current_config["window_system"])()
-            hints, window_extents = gather_hints(current_config, window_system)
+            hints, window_extents = gather_hints(
+                current_config, window_system, self._atspi_active_accessible
+            )
         except Exception:  # pylint: disable=broad-except
             logger.debug("Failed to gather hints", exc_info=True)
             return {"status": "error"}

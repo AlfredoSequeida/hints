@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 class AtspiBackend(HintsBackend):
     """Atspi backend class."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args, atspi_active_window: "Atspi.Accessible | None" = None, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.backend_name = "atspi"
         self.states = set()
@@ -35,6 +37,7 @@ class AtspiBackend(HintsBackend):
         self.toolkit_version = ""
         self.scale_factor = 1
         self._window_extents: tuple[int, int, int, int] | None = None
+        self._atspi_active_window_cache: Atspi.Accessible | None = atspi_active_window
 
     def get_relative_and_absolute_extents(
         self, root: Atspi.Accessible
@@ -302,10 +305,24 @@ class AtspiBackend(HintsBackend):
 
         :return: Atspi focused window / accessible root element.
         """
+        # Fast path: use the accessible cached by the daemon's window:activate
+        # listener. Validate the PID to guard against stale cache (e.g. window
+        # closed and a different one focused before the next event arrived).
+        if self._atspi_active_window_cache is not None:
+            try:
+                if (
+                    self._atspi_active_window_cache.get_process_id()
+                    == self.window_system.focused_window_pid
+                ):
+                    return self._atspi_active_window_cache
+            except Exception:
+                pass
+
+        # Fallback: search with retries to allow AT-SPI's ACTIVE state to
+        # propagate. Covers cold-start (daemon launched after the window was
+        # already focused, so no window:activate event was received) and other
+        # edge cases where the cache is absent or invalid.
         attempts = 3
-        # AT-SPI ACTIVE state is set asynchronously by the toolkit after the
-        # X11 FocusIn event is processed. Retry briefly to allow that
-        # propagation to complete before giving up.
         for attempt in range(attempts):
             desktop = Atspi.get_desktop(0)
             for app_index in range(desktop.get_child_count()):

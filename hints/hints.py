@@ -200,19 +200,29 @@ def get_hints(children: list[Child], alphabet: str) -> dict[str, Child]:
 
 
 def gather_hints(
-    config: HintsConfig, window_system: WindowSystem
+    config: HintsConfig,
+    window_system: WindowSystem,
+    atspi_active_window=None,
 ) -> tuple[dict[str, Child], tuple[int, int, int, int] | None]:
     """Run the enabled backends until one yields hints.
 
     :param config: Hints config.
     :param window_system: Window system for the session.
+    :param atspi_active_window: Cached AT-SPI accessible for the focused
+        window, supplied by the daemon's window:activate listener. When
+        present the atspi backend skips the desktop search entirely.
     :return: A (hints, window_extents) tuple. window_extents is None
         when no backend produced hints.
     """
     for backend in config["backends"]["enable"]:
 
         start = time()
-        current_backend = load_backend(backend)(config, window_system)
+        if backend == "atspi":
+            current_backend = load_backend(backend)(
+                config, window_system, atspi_active_window=atspi_active_window
+            )
+        else:
+            current_backend = load_backend(backend)(config, window_system)
         logger.debug(
             "Attempting to get accessible children using the '%s' backend.",
             backend,
