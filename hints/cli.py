@@ -16,6 +16,7 @@ from argparse import ArgumentParser
 from pickle import dumps, loads
 from socket import AF_UNIX, SOCK_STREAM, socket
 
+from hints import __version__
 from hints.ipc_constants import SOCKET_MESSAGE_SIZE, UNIX_DOMAIN_SOCKET_FILE
 
 
@@ -78,9 +79,20 @@ def main():
         " runs in-process so output reaches this terminal.",
     )
     parser.add_argument(
+        "-V",
+        "--version",
+        action="store_true",
+        default=False,
+        help="Show the hints version.",
+    )
+    parser.add_argument(
         "-s", "--setup", action="store_true", default=False, help="Guided hints setup."
     )
     args = parser.parse_args()
+
+    if args.version:
+        print(__version__)
+        return
 
     # Fast path: non-verbose hint mode triggers the warm daemon. Any verbose,
     # setup, or scroll invocation runs standalone so its output reaches this
@@ -90,8 +102,7 @@ def main():
             trigger_daemon(args.mode, args.verbose)
             return
         except OSError:
-            # Daemon unreachable: fall through to the standalone path.
-            pass
+            pass  # Daemon unreachable: fall through to standalone.
 
     _run_standalone()
 
