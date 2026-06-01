@@ -139,8 +139,8 @@ s = setup(
     ],
     entry_points={
         "console_scripts": [
-            "hints = hints.hints:main",
-            "hintsd = hints.mouse_service:main",
+            "hints = hints.cli:main",
+            "hintsd = hints.service:main",
         ]
     },
     cmdclass={"install": PostInstallCommand},

@@ -35,7 +35,7 @@ class X11(WindowSystem):
 
         :return: Active window extents (x, y, width, height).
         """
-        return self.active_window.get_geometry()
+        return self.active_window.get_client_window_geometry()
 
     @property
     def focused_window_pid(self) -> int:

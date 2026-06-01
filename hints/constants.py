@@ -4,14 +4,20 @@ from os import path
 
 from gi import require_version
 
+# Re-exported for backward compatibility. Defined in a gi-free module so
+# lightweight clients can import them without loading GTK/AT-SPI.
+from hints.ipc_constants import SOCKET_MESSAGE_SIZE, UNIX_DOMAIN_SOCKET_FILE
+
 require_version("Gdk", "3.0")
 require_version("Atspi", "2.0")
 from gi.repository import Atspi, Gdk
 
 CONFIG_PATH = path.join(path.expanduser("~"), ".config/hints/config.json")
+# Per-element accessibility detail logging. Below DEBUG so that timing/phase
+# logs (-v) are not polluted by the extra D-Bus calls these logs require; only
+# enabled at -vv.
+ELEMENT_DETAIL_LOG_LEVEL = 5
 MOUSE_GRAB_PAUSE = 0.2
-UNIX_DOMAIN_SOCKET_FILE = "/tmp/hints.socket"
-SOCKET_MESSAGE_SIZE = 1024
 DEFAULT_CONFIG = {
     "hints": {
         "hint_height": 30,
@@ -75,6 +81,7 @@ DEFAULT_CONFIG = {
             },
         },
         "opencv": {
+            "preload": False,
             "application_rules": {
                 "default": {
                     "kernel_size": 6,

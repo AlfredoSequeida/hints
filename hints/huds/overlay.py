@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import logging
+from time import time
+from typing import TYPE_CHECKING, Any, Callable
 
 from gi import require_foreign, require_version
 
@@ -20,6 +22,8 @@ if TYPE_CHECKING:
 
     from hints.child import Child
 
+logger = logging.getLogger(__name__)
+
 
 class OverlayWindow(Gtk.Window):
     """Composite widget to overlay hints over a window."""
@@ -34,6 +38,8 @@ class OverlayWindow(Gtk.Window):
         hints: dict[str, Child],
         mouse_action: dict[str, Any],
         is_wayland: bool = False,
+        launch_time: float | None = None,
+        on_complete: Callable[[], None] | None = None,
     ):
         """Hint overlay constructor.
 
@@ -44,6 +50,9 @@ class OverlayWindow(Gtk.Window):
         :param config: Hints config.
         :param hints: Hints to draw.
         :param mouse_action: Mouse action information.
+        :param on_complete: Called once the overlay is done (a hint was
+            selected or the user exited). When omitted, the window quits
+            the GTK main loop, preserving the standalone behavior.
         """
         super().__init__(Gtk.WindowType.POPUP)
 
@@ -53,6 +62,8 @@ class OverlayWindow(Gtk.Window):
         self.hint_selector_state = ""
         self.mouse_action = mouse_action
         self.is_wayland = is_wayland
+        self.launch_time = launch_time
+        self.on_complete = on_complete
 
         # hint settings
         hints_config = config["hints"]
@@ -99,7 +110,7 @@ class OverlayWindow(Gtk.Window):
 
         self.drawing_area = Gtk.DrawingArea()
 
-        self.connect("destroy", Gtk.main_quit)
+        self.connect("destroy", self._on_destroy)
         self.connect("key-press-event", self.on_key_press)
         self.connect("show", self.on_show)
         self.drawing_area.connect("draw", self.on_draw)
@@ -116,11 +127,100 @@ class OverlayWindow(Gtk.Window):
         self.add(vpaned)
         vpaned.pack1(put_in_frame(self.drawing_area), True, True)
 
+    def reset(
+        self,
+        x_pos: float,
+        y_pos: float,
+        width: float,
+        height: float,
+        config: HintsConfig,
+        hints: dict,
+        mouse_action: dict,
+        launch_time: float | None = None,
+    ):
+        """Reset per-trigger state so the window can be reused without recreating it.
+
+        :param x_pos: New X window position.
+        :param y_pos: New Y window position.
+        :param width: New window width.
+        :param height: New window height.
+        :param config: Hints config (re-read so user edits apply without daemon restart).
+        :param hints: New hints to display.
+        :param mouse_action: Fresh mouse action dict for this trigger.
+        :param launch_time: Trigger timestamp for paint-latency logging.
+        """
+        self.width = width
+        self.height = height
+        self.hints = hints
+        self.hint_selector_state = ""
+        self.mouse_action = mouse_action
+        self.launch_time = launch_time
+        self.hints_drawn_offsets = {}
+
+        hints_config = config["hints"]
+        self.hint_height = hints_config["hint_height"]
+        self.hint_width_padding = hints_config["hint_width_padding"]
+        self.hint_font_size = hints_config["hint_font_size"]
+        self.hint_font_face = hints_config["hint_font_face"]
+        self.hint_font_r = hints_config["hint_font_r"]
+        self.hint_font_g = hints_config["hint_font_g"]
+        self.hint_font_b = hints_config["hint_font_b"]
+        self.hint_font_a = hints_config["hint_font_a"]
+        self.hint_pressed_font_r = hints_config["hint_pressed_font_r"]
+        self.hint_pressed_font_g = hints_config["hint_pressed_font_g"]
+        self.hint_pressed_font_b = hints_config["hint_pressed_font_b"]
+        self.hint_pressed_font_a = hints_config["hint_pressed_font_a"]
+        self.hint_upercase = hints_config["hint_upercase"]
+        self.hint_background_r = hints_config["hint_background_r"]
+        self.hint_background_g = hints_config["hint_background_g"]
+        self.hint_background_b = hints_config["hint_background_b"]
+        self.hint_background_a = hints_config["hint_background_a"]
+        self.exit_key = config["exit_key"]
+        self.hover_modifier = config["hover_modifier"]
+        self.grab_modifier = config["grab_modifier"]
+
+        self.resize(width, height)
+        self.move(x_pos, y_pos)
+        self.drawing_area.queue_draw()
+
+    def _finish(self):
+        """Complete overlay interaction: ungrab, notify caller, then hide or destroy.
+
+        In daemon mode (on_complete set) the window is hidden rather than destroyed
+        so it can be reused on the next trigger. In standalone mode the window is
+        destroyed so _on_destroy fires and quits the GTK main loop.
+        """
+        if not self.is_wayland:
+            Gdk.Display.get_default().get_default_seat().ungrab()
+        if self.on_complete is not None:
+            self.on_complete()
+            self.hide()
+        else:
+            self.destroy()
+
+    def _on_destroy(self, *_):
+        """Handle window teardown.
+
+        Invokes the completion callback when one was provided (daemon
+        mode), otherwise quits the GTK main loop (standalone mode).
+        """
+        if self.on_complete is not None:
+            self.on_complete()
+        else:
+            Gtk.main_quit()
+
     def on_draw(self, _, cr: Context):
         """Draw hints.
 
         :param cr: Cairo Context.
         """
+        if self.launch_time is not None:
+            logger.debug(
+                "Time from launch to first hint paint: %f seconds",
+                time() - self.launch_time,
+            )
+            self.launch_time = None
+
         hint_height = self.hint_height
 
         cr.select_font_face(self.hint_font_face, FONT_SLANT_NORMAL, FONT_WEIGHT_BOLD)
@@ -232,7 +332,8 @@ class OverlayWindow(Gtk.Window):
         keyval_lower = Gdk.keyval_to_lower(event.keyval)
 
         if keyval_lower == self.exit_key:
-            Gtk.main_quit()
+            self._finish()
+            return
 
         if modifiers == self.hover_modifier:
             self.mouse_action.update({"action": "hover"})
@@ -253,8 +354,6 @@ class OverlayWindow(Gtk.Window):
         self.update_hints(hint_chr)
 
         if len(self.hints) == 1:
-            Gdk.keyboard_ungrab(event.time)
-            self.destroy()
             x, y = self.hints[self.hint_selector_state].absolute_position
             x_offset, y_offset = self.hints_drawn_offsets[self.hint_selector_state]
             self.mouse_action.update(
@@ -266,6 +365,8 @@ class OverlayWindow(Gtk.Window):
                     "button": self.mouse_action.get("button", MouseButton.LEFT),
                 }
             )
+            # Finish last so the completion callback runs with a fully populated mouse_action.
+            self._finish()
 
     def on_show(self, window):
         """Setup window on show.
@@ -276,12 +377,21 @@ class OverlayWindow(Gtk.Window):
         :param window: Gtk Window object.
         """
 
-        while (
-            not self.is_wayland
-            and Gdk.keyboard_grab(window.get_window(), False, Gdk.CURRENT_TIME)
-            != Gdk.GrabStatus.SUCCESS
-        ):
-            pass
+        if not self.is_wayland:
+            seat = Gdk.Display.get_default().get_default_seat()
+            gdk_window = window.get_window()
+            while (
+                seat.grab(
+                    gdk_window,
+                    Gdk.SeatCapabilities.KEYBOARD,
+                    False,
+                    None,
+                    None,
+                    None,
+                )
+                != Gdk.GrabStatus.SUCCESS
+            ):
+                pass
 
         Gdk.Window.set_cursor(
             self.get_window(),  # Gdk Window object

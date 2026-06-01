@@ -1,7 +1,7 @@
 """Mouse functions.
 
 This module is a skeleton and does not contain any of the mouse logic.
-The mouse logic lives in mouse_service.py. This module communicates with
+The mouse logic lives in service.py. This module communicates with
 the hintsd service via a Unix Domain Socket for Interprocess
 Communication.
 """
@@ -20,22 +20,22 @@ if TYPE_CHECKING:
     from hints.mouse_enums import MouseButton, MouseButtonState, MouseMode
 
 
-class CouldNotCommunicateWithTheMouseService(Exception):
-    """Exception to raise when the mouse service could not be reached."""
+class CouldNotCommunicateWithTheHintsService(Exception):
+    """Exception to raise when the hintsd service could not be reached."""
 
     def __str__(self):
         return "Could not communicate with the hintsd service. Is it running?"
 
 
 def send_message(method: str, *args, **kwargs) -> Any:
-    """Send message to hint-mouse service.
+    """Send message to the hintsd service.
 
     :param method: The name of the method to call.
     :param args: args for the method.
     :param kwargs: kwargs for the method.
-    :param return: The payload sent back from the mouse service.
-    :raises CouldNotCommunicateWithTheMouseService: When the sock file
-        does not exist (the mouse service creates this file).
+    :param return: The payload sent back from the hintsd service.
+    :raises CouldNotCommunicateWithTheHintsService: When the sock file
+        does not exist (the hintsd service creates this file).
     """
     with socket(AF_UNIX, SOCK_STREAM) as client:
         client.connect(UNIX_DOMAIN_SOCKET_FILE)

@@ -1,6 +1,7 @@
 """Accessibility backend to get elements from an application using Atspi."""
 
 import logging
+from time import sleep
 from typing import Literal
 
 from gi import require_version
@@ -13,6 +14,7 @@ from gi.repository import Atspi
 from hints.backends.backend import HintsBackend
 from hints.backends.exceptions import AccessibleChildrenNotFoundError
 from hints.child import Child
+from hints.constants import ELEMENT_DETAIL_LOG_LEVEL
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,9 @@ logger = logging.getLogger(__name__)
 class AtspiBackend(HintsBackend):
     """Atspi backend class."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args, atspi_active_window: "Atspi.Accessible | None" = None, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.backend_name = "atspi"
         self.states = set()
@@ -32,6 +36,8 @@ class AtspiBackend(HintsBackend):
         self.toolkit = ""
         self.toolkit_version = ""
         self.scale_factor = 1
+        self._window_extents: tuple[int, int, int, int] | None = None
+        self._atspi_active_window_cache: Atspi.Accessible | None = atspi_active_window
 
     def get_relative_and_absolute_extents(
         self, root: Atspi.Accessible
@@ -48,7 +54,7 @@ class AtspiBackend(HintsBackend):
         :param root: Accessible element to get extents for.
         :return: absolute_position, relative_position, and extents.
         """
-        start_x, start_y, _, _ = self.window_system.focused_window_extents
+        start_x, start_y, _, _ = self._window_extents
 
         # GTK4 and Wayland do not support absolute positioning, so we work off relative positions
         if self.window_system.window_system_type == WindowSystemType.WAYLAND or (
@@ -179,15 +185,21 @@ class AtspiBackend(HintsBackend):
             if (
                 self.validate_match_conditions(root, "state")
                 and self.validate_match_conditions(root, "role")
-                and self.window_system.focused_window_extents
+                and self._window_extents
             ):
-                logger.debug(
-                    "Accessible element matched. Name: %s, ID: %d",
-                    root.name,
-                    root.get_id(),
-                )
-                logger.debug("role: %s", root.get_role())
-                logger.debug("states: %s", root.get_state_set().get_states())
+                if logger.isEnabledFor(ELEMENT_DETAIL_LOG_LEVEL):
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "Accessible element matched. Name: %s, ID: %d",
+                        root.name,
+                        root.get_id(),
+                    )
+                    logger.log(ELEMENT_DETAIL_LOG_LEVEL, "role: %s", root.get_role())
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "states: %s",
+                        root.get_state_set().get_states(),
+                    )
 
                 children.append(
                     Child(
@@ -239,7 +251,7 @@ class AtspiBackend(HintsBackend):
 
         collection = root.get_collection_iface()
 
-        if collection and self.window_system.focused_window_extents:
+        if collection and self._window_extents:
             matches = collection.get_matches(
                 match_rule, Atspi.CollectionSortOrder.CANONICAL, 0, True
             )
@@ -254,13 +266,19 @@ class AtspiBackend(HintsBackend):
                 if relative_position[0] < 0 or relative_position[1] < 0:
                     continue
 
-                logger.debug(
-                    "Accessible element matched. Name: %s, ID: %d",
-                    match.name,
-                    match.get_id(),
-                )
-                logger.debug("role: %s", match.get_role())
-                logger.debug("states: %s", match.get_state_set().get_states())
+                if logger.isEnabledFor(ELEMENT_DETAIL_LOG_LEVEL):
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "Accessible element matched. Name: %s, ID: %d",
+                        match.name,
+                        match.get_id(),
+                    )
+                    logger.log(ELEMENT_DETAIL_LOG_LEVEL, "role: %s", match.get_role())
+                    logger.log(
+                        ELEMENT_DETAIL_LOG_LEVEL,
+                        "states: %s",
+                        match.get_state_set().get_states(),
+                    )
 
                 children.append(
                     Child(
@@ -287,27 +305,49 @@ class AtspiBackend(HintsBackend):
 
         :return: Atspi focused window / accessible root element.
         """
-        desktop = Atspi.get_desktop(0)
-        for app_index in range(desktop.get_child_count()):
-            window = desktop.get_child_at_index(app_index)
-            # Gnome creates a mutter application that is also focused.
-            # This is not what we want, so we are skipping it.
-            if "mutter-x11-frames" in window.get_description():
-                continue
-            for window_index in range(window.get_child_count()):
-                current_window = window.get_child_at_index(window_index)
-                if current_window is None:
-                    continue
-                # Some hidden windows that are minimized to status trays
-                # (like discord) will still have the Atspi.StateType.Active
-                # state, so the pid from the window manger allows us to filter
-                # out such applications.
+        # Fast path: use the accessible cached by the daemon's window:activate
+        # listener. Validate the PID to guard against stale cache (e.g. window
+        # closed and a different one focused before the next event arrived).
+        if self._atspi_active_window_cache is not None:
+            try:
                 if (
-                    current_window.get_state_set().contains(Atspi.StateType.ACTIVE)
-                    and current_window.get_process_id()
+                    self._atspi_active_window_cache.get_process_id()
                     == self.window_system.focused_window_pid
                 ):
-                    return current_window
+                    return self._atspi_active_window_cache
+            except Exception:
+                pass
+
+        # Fallback: search with retries to allow AT-SPI's ACTIVE state to
+        # propagate. Covers cold-start (daemon launched after the window was
+        # already focused, so no window:activate event was received) and other
+        # edge cases where the cache is absent or invalid.
+        attempts = 3
+        for attempt in range(attempts):
+            desktop = Atspi.get_desktop(0)
+            for app_index in range(desktop.get_child_count()):
+                window = desktop.get_child_at_index(app_index)
+                # Gnome creates a mutter application that is also focused.
+                # This is not what we want, so we are skipping it.
+                if "mutter-x11-frames" in window.get_description():
+                    continue
+                for window_index in range(window.get_child_count()):
+                    current_window = window.get_child_at_index(window_index)
+                    if current_window is None:
+                        continue
+                    # Some hidden windows that are minimized to status trays
+                    # (like discord) will still have the Atspi.StateType.Active
+                    # state, so the pid from the window manger allows us to filter
+                    # out such applications.
+                    if (
+                        current_window.get_state_set().contains(Atspi.StateType.ACTIVE)
+                        and current_window.get_process_id()
+                        == self.window_system.focused_window_pid
+                    ):
+                        return current_window
+
+            if attempt < attempts - 1:
+                sleep(0.05)
 
         return None
 
@@ -320,6 +360,11 @@ class AtspiBackend(HintsBackend):
             centered children coordinates.
         """
         children: list[Child] = []
+
+        # The focused window cannot move while hints are gathered synchronously,
+        # so resolve its extents once instead of per element.
+        self._window_extents = self.window_system.focused_window_extents
+
         window = self.get_atspi_active_window()
 
         if window:

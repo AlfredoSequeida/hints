@@ -46,6 +46,19 @@ Run the install script:
 curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash
 ```
 
+> [!NOTE]  
+> By default, the install script installs the latest release.
+> If you want to install a specific version add ` -s -- --version {version}` to the end of the command.
+> A version can be a release, commit, tag, or branch. Here are some examples:
+>
+> ```
+> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version main
+> ```
+>
+> ```
+> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version 0.0.7
+> ```
+
 ## Setup
 
 1. To facilitate setup, hints ships with a setup script.
