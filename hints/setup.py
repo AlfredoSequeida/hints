@@ -20,6 +20,8 @@ USER = getenv("SUDO_USER", "$SUDO_USER")
 XPROFILE_FILE = Path(f"/home/{USER}/.xprofile")
 XINITRC_FILE = Path(f"/home/{USER}/.xinitrc")
 
+_is_x11 = get_window_system_type() == WindowSystemType.X11
+
 Changes = list[str] | None
 SetupFunction = Callable[..., Changes]
 
@@ -46,10 +48,15 @@ def setup_function(setup_description: str, post_setup_instruction: str = ""):
     return decorator
 
 
-@setup_function(
+_accessibility_vars_description = (
     f"Add any missing accessibility environment variables to {ENVIRONMENT_VARIABLES_FILE}, "
     f"{XPROFILE_FILE} (display-manager sessions), and {XINITRC_FILE} (startx sessions)."
+    if _is_x11
+    else f"Add any missing accessibility environment variables to {ENVIRONMENT_VARIABLES_FILE}."
 )
+
+
+@setup_function(_accessibility_vars_description)
 def setup_accessibility_variables() -> Changes:
     changes = []
     expected_env_vars = {
@@ -75,21 +82,22 @@ def setup_accessibility_variables() -> Changes:
         with open(ENVIRONMENT_VARIABLES_FILE, "a") as _f:
             _f.write("# Added by `hints --setup`\n" + env_vars_to_add)
 
-    existing_xprofile = XPROFILE_FILE.read_text() if XPROFILE_FILE.exists() else ""
-    xprofile_vars_to_add = ""
+    if _is_x11:
+        existing_xprofile = XPROFILE_FILE.read_text() if XPROFILE_FILE.exists() else ""
+        xprofile_vars_to_add = ""
 
-    for expected_key, expected_val in expected_env_vars.items():
-        if f"{expected_key}=" not in existing_xprofile:
-            xprofile_vars_to_add += f"export {expected_key}={expected_val}\n"
-            changes.append(
-                f"Added export {expected_key}={expected_val} to {XPROFILE_FILE}"
-            )
+        for expected_key, expected_val in expected_env_vars.items():
+            if f"{expected_key}=" not in existing_xprofile:
+                xprofile_vars_to_add += f"export {expected_key}={expected_val}\n"
+                changes.append(
+                    f"Added export {expected_key}={expected_val} to {XPROFILE_FILE}"
+                )
 
-    if xprofile_vars_to_add:
-        with open(XPROFILE_FILE, "a") as _f:
-            _f.write("\n# Added by `hints --setup`\n" + xprofile_vars_to_add)
+        if xprofile_vars_to_add:
+            with open(XPROFILE_FILE, "a") as _f:
+                _f.write("\n# Added by `hints --setup`\n" + xprofile_vars_to_add)
 
-    changes += _setup_xinitrc_vars(expected_env_vars)
+        changes += _setup_xinitrc_vars(expected_env_vars)
 
     return changes or None
 
