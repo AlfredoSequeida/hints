@@ -2,6 +2,19 @@
 
 UV_INSTALLATION_PATH=`mktemp -d`
 BIN_DIR=""
+HINTS_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      HINTS_VERSION="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 print_instruction_header() {
   echo ""
@@ -56,11 +69,28 @@ install_uv() {
   BIN_DIR=`$UV_INSTALLATION_PATH/uv tool dir --bin`
 }
 
+get_latest_tag() {
+  git ls-remote --tags --sort=-v:refname https://github.com/AlfredoSequeida/hints \
+    | grep -v '\^{}' \
+    | head -n 1 \
+    | sed 's/.*refs\/tags\///'
+}
+
 install_hints() {
   print_instruction_header "Installing hints."
 
-  HINTS_EXPECTED_BIN_DIR="$BIN_DIR" $UV_INSTALLATION_PATH/uv tool install --force git+https://github.com/AlfredoSequeida/hints
-  $UV_INSTALLATION_PATH/uv tool update-shell 
+  if [ -z "$HINTS_VERSION" ]; then
+    HINTS_VERSION=$(get_latest_tag)
+    [ -n "$HINTS_VERSION" ] && echo "Using latest tag: $HINTS_VERSION"
+  else
+    echo "Using version: $HINTS_VERSION"
+  fi
+
+  local ref=""
+  [ -n "$HINTS_VERSION" ] && ref="@$HINTS_VERSION"
+
+  HINTS_EXPECTED_BIN_DIR="$BIN_DIR" $UV_INSTALLATION_PATH/uv tool install --force "git+https://github.com/AlfredoSequeida/hints${ref}"
+  $UV_INSTALLATION_PATH/uv tool update-shell
 }
 
 cleanup () {
