@@ -51,11 +51,11 @@ curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.
 > A version can be a release, commit, tag, or branch. Here are some examples:
 >
 > ```
-> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version main`
+> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version main
 > ```
 >
 > ```
-> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version 0.0.7`
+> curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version 0.0.7
 > ```
 
 ## Setup
