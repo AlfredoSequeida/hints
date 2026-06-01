@@ -47,6 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.
 ```
 
 > [!NOTE]  
+> By default, the install script installs the latest release.
 > If you want to install a specific version add ` -s -- --version {version}` to the end of the command.
 > A version can be a release, commit, tag, or branch. Here are some examples:
 >
