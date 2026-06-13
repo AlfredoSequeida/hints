@@ -395,7 +395,7 @@ class HintsService:
                     {
                         "click": self.mouse.click,
                         "move": self.mouse.move,
-                        "scoll": self.mouse.scroll,
+                        "scroll": self.mouse.scroll,
                         "do_mouse_action": self.mouse.do_mouse_action,
                         "show_hints": self.show_hints,
                     }[method](*args, **kwargs)
