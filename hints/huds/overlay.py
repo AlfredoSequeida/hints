@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from time import time
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -276,34 +277,67 @@ class OverlayWindow(Gtk.Window):
 
         Each hint is assigned the smallest layer index not already used by a
         hint it overlaps, so two overlapping hints never share a layer.
-        Non-overlapping hints stay on layer 0. This is the naive O(n^2)
-        all-pairs approach; spatial-grid hashing is the fallback if it ever
-        becomes a bottleneck.
+        Non-overlapping hints stay on layer 0.
+
+        Overlap candidates are found with a uniform spatial grid (a hash from
+        cell coordinate to the hints touching that cell) so each hint is only
+        tested against nearby hints instead of every already-colored hint. The
+        cell size is the largest hint dimension, so a hint spans at most a few
+        cells and each cell holds O(1) hints in typical layouts, giving roughly
+        O(n) overall instead of O(n^2). The colors produced are identical to a
+        naive all-pairs scan; only the candidate search is faster.
 
         :param rects: Ordered mapping of hint -> ``(x, y, w, h)``.
         :param margin: Slack (px) added when testing whether two rects overlap.
         :return: ``(layers, num_layers)``.
         """
         layers: dict[str, int] = {}
+        if not rects:
+            return layers, 1
+
+        # Cell size = largest hint dimension so each rect spans only a couple
+        # of cells. Guard against a degenerate zero size.
+        cell = max(max(w, h) for _, _, w, h in rects.values())
+        cell = max(cell, 1)
+
+        grid: dict[tuple[int, int], list[str]] = defaultdict(list)
 
         for hint, (hx, hy, hw, hh) in rects.items():
+            # Cells covered by this hint's rectangle inflated by the margin.
+            # Inflating both the inserted and queried cells guarantees any two
+            # rects that overlap (within margin) share at least one cell.
+            min_cx = int((hx - margin) // cell)
+            max_cx = int((hx + hw + margin) // cell)
+            min_cy = int((hy - margin) // cell)
+            max_cy = int((hy + hh + margin) // cell)
+
             taken = set()
-            for other, layer in layers.items():
-                ox, oy, ow, oh = rects[other]
-                if (
-                    hx < ox + ow + margin
-                    and hx + hw + margin > ox
-                    and hy < oy + oh + margin
-                    and hy + hh + margin > oy
-                ):
-                    taken.add(layer)
+            checked = set()
+            for cx in range(min_cx, max_cx + 1):
+                for cy in range(min_cy, max_cy + 1):
+                    for other in grid[(cx, cy)]:
+                        if other in checked:
+                            continue
+                        checked.add(other)
+                        ox, oy, ow, oh = rects[other]
+                        if (
+                            hx < ox + ow + margin
+                            and hx + hw + margin > ox
+                            and hy < oy + oh + margin
+                            and hy + hh + margin > oy
+                        ):
+                            taken.add(layers[other])
 
             layer = 0
             while layer in taken:
                 layer += 1
             layers[hint] = layer
 
-        num_layers = max(layers.values(), default=0) + 1
+            for cx in range(min_cx, max_cx + 1):
+                for cy in range(min_cy, max_cy + 1):
+                    grid[(cx, cy)].append(hint)
+
+        num_layers = max(layers.values()) + 1
         return layers, num_layers
 
     def _assign_layers(self, cr: Context):
@@ -322,9 +356,7 @@ class OverlayWindow(Gtk.Window):
         if self.active_layer >= self.num_layers:
             self.active_layer = 0
 
-    def _draw_hint(
-        self, cr: Context, hint_value: str, child, alpha_mult: float
-    ):
+    def _draw_hint(self, cr: Context, hint_value: str, child, alpha_mult: float):
         """Draw a single hint.
 
         :param cr: Cairo Context.
