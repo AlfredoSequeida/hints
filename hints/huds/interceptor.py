@@ -105,16 +105,7 @@ class InterceptorWindow(Gtk.Window):
     def on_key_press(self, _, event):
         """Handle key presses :param event: Event object."""
 
-        keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
-
-        # if keyval is bound, keyval, effective_group, level, consumed_modifiers
-        _, keyval, _, _, _ = keymap.translate_keyboard_state(
-            event.hardware_keycode,
-            Gdk.ModifierType(event.state & ~Gdk.ModifierType.LOCK_MASK),
-            1,
-        )
-
-        keyval_lower = Gdk.keyval_to_lower(keyval)
+        keyval_lower = Gdk.keyval_to_lower(event.keyval)
 
         if keyval_lower == self.config["exit_key"]:
             self._mouse.click(
