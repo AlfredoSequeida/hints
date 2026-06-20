@@ -47,7 +47,6 @@ DEFAULT_CONFIG = {
                     "states": [
                         Atspi.StateType.SENSITIVE,
                         Atspi.StateType.SHOWING,
-                        Atspi.StateType.VISIBLE,
                     ],
                     "states_match_type": Atspi.CollectionMatchType.ALL,
                     "attributes": {},
