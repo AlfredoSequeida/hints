@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from time import time
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -87,13 +88,22 @@ class OverlayWindow(Gtk.Window):
         self.hint_background_g = hints_config["hint_background_g"]
         self.hint_background_b = hints_config["hint_background_b"]
         self.hint_background_a = hints_config["hint_background_a"]
+        self.hint_inactive_layer_opacity = hints_config["hint_inactive_layer_opacity"]
+        self.hint_overlap_margin = hints_config["hint_overlap_margin"]
 
         # key settings
         self.exit_key = config["exit_key"]
+        self.layer_toggle_key = config["layer_toggle_key"]
         self.hover_modifier = config["hover_modifier"]
         self.grab_modifier = config["grab_modifier"]
 
         self.hints_drawn_offsets: dict[str, tuple[float, float]] = {}
+
+        # layering of overlapping hints
+        self.hint_layers: dict[str, int] = {}
+        self.num_layers = 1
+        self.active_layer = 0
+        self._layers_dirty = True
 
         # composite setup
         screen = self.get_screen()
@@ -175,9 +185,17 @@ class OverlayWindow(Gtk.Window):
         self.hint_background_g = hints_config["hint_background_g"]
         self.hint_background_b = hints_config["hint_background_b"]
         self.hint_background_a = hints_config["hint_background_a"]
+        self.hint_inactive_layer_opacity = hints_config["hint_inactive_layer_opacity"]
+        self.hint_overlap_margin = hints_config["hint_overlap_margin"]
         self.exit_key = config["exit_key"]
+        self.layer_toggle_key = config["layer_toggle_key"]
         self.hover_modifier = config["hover_modifier"]
         self.grab_modifier = config["grab_modifier"]
+
+        self.hint_layers = {}
+        self.num_layers = 1
+        self.active_layer = 0
+        self._layers_dirty = True
 
         self.resize(width, height)
         self.move(x_pos, y_pos)
@@ -209,6 +227,203 @@ class OverlayWindow(Gtk.Window):
         else:
             Gtk.main_quit()
 
+    def _hint_rect(self, cr: Context, hint_value: str, child):
+        """Compute a hint's drawn geometry.
+
+        Shared by layer assignment and drawing so both agree on where a hint
+        lands and how big it is.
+
+        :param cr: Cairo Context (used for text measurement).
+        :param hint_value: The hint label.
+        :param child: The element the hint is centered on.
+        :return: ``(hint_x, hint_y, hint_width, hint_height, hint_x_offset,
+            hint_y_offset, text_x, text_y)`` where the first four describe the
+            rectangle in window coordinates.
+        """
+        x_loc, y_loc = child.relative_position
+        utf8 = hint_value.upper() if self.hint_upercase else hint_value
+
+        x_bearing, y_bearing, width, height, _, _ = cr.text_extents(utf8)
+        hint_height = self.hint_height
+        hint_width = width + self.hint_width_padding
+
+        # offset to bring top left corner of a hint to the correct possition
+        # so that the hint is centered on the object
+        hint_x_offset = child.width / 2 - hint_width / 2
+        hint_y_offset = child.height / 2 - hint_height / 2
+
+        hint_x = x_loc + hint_x_offset
+        hint_y = y_loc + hint_y_offset
+
+        text_x = (hint_width / 2) - (width / 2 + x_bearing)
+        text_y = (hint_height / 2) - (height / 2 + y_bearing)
+
+        return (
+            hint_x,
+            hint_y,
+            hint_width,
+            hint_height,
+            hint_x_offset,
+            hint_y_offset,
+            text_x,
+            text_y,
+        )
+
+    @staticmethod
+    def _color_rects(
+        rects: dict[str, tuple[float, float, float, float]], margin: float
+    ) -> tuple[dict[str, int], int]:
+        """Greedy graph-coloring of overlapping hint rectangles.
+
+        Each hint is assigned the smallest layer index not already used by a
+        hint it overlaps, so two overlapping hints never share a layer.
+        Non-overlapping hints stay on layer 0.
+
+        Overlap candidates are found with a uniform spatial grid (a hash from
+        cell coordinate to the hints touching that cell) so each hint is only
+        tested against nearby hints instead of every already-colored hint. The
+        cell size is the largest hint dimension, so a hint spans at most a few
+        cells and each cell holds O(1) hints in typical layouts, giving roughly
+        O(n) overall instead of O(n^2). The colors produced are identical to a
+        naive all-pairs scan; only the candidate search is faster.
+
+        :param rects: Ordered mapping of hint -> ``(x, y, w, h)``.
+        :param margin: Slack (px) added when testing whether two rects overlap.
+        :return: ``(layers, num_layers)``.
+        """
+        layers: dict[str, int] = {}
+        if not rects:
+            return layers, 1
+
+        # Cell size = largest hint dimension so each rect spans only a couple
+        # of cells. Guard against a degenerate zero size.
+        cell = max(max(w, h) for _, _, w, h in rects.values())
+        cell = max(cell, 1)
+
+        grid: dict[tuple[int, int], list[str]] = defaultdict(list)
+
+        for hint, (hx, hy, hw, hh) in rects.items():
+            # Cells covered by this hint's rectangle inflated by the margin.
+            # Inflating both the inserted and queried cells guarantees any two
+            # rects that overlap (within margin) share at least one cell.
+            min_cx = int((hx - margin) // cell)
+            max_cx = int((hx + hw + margin) // cell)
+            min_cy = int((hy - margin) // cell)
+            max_cy = int((hy + hh + margin) // cell)
+
+            taken = set()
+            checked = set()
+            for cx in range(min_cx, max_cx + 1):
+                for cy in range(min_cy, max_cy + 1):
+                    for other in grid[(cx, cy)]:
+                        if other in checked:
+                            continue
+                        checked.add(other)
+                        ox, oy, ow, oh = rects[other]
+                        if (
+                            hx < ox + ow + margin
+                            and hx + hw + margin > ox
+                            and hy < oy + oh + margin
+                            and hy + hh + margin > oy
+                        ):
+                            taken.add(layers[other])
+
+            layer = 0
+            while layer in taken:
+                layer += 1
+            layers[hint] = layer
+
+            for cx in range(min_cx, max_cx + 1):
+                for cy in range(min_cy, max_cy + 1):
+                    grid[(cx, cy)].append(hint)
+
+        num_layers = max(layers.values()) + 1
+        return layers, num_layers
+
+    def _assign_layers(self, cr: Context):
+        """Assign every visible hint to a layer based on overlap.
+
+        :param cr: Cairo Context (used for text measurement).
+        """
+        rects = {
+            hint_value: self._hint_rect(cr, hint_value, child)[:4]
+            for hint_value, child in self.hints.items()
+            if child.relative_position[0] >= 0 and child.relative_position[1] >= 0
+        }
+        self.hint_layers, self.num_layers = self._color_rects(
+            rects, self.hint_overlap_margin
+        )
+        if self.active_layer >= self.num_layers:
+            self.active_layer = 0
+
+    def _draw_hint(self, cr: Context, hint_value: str, child, alpha_mult: float):
+        """Draw a single hint.
+
+        :param cr: Cairo Context.
+        :param hint_value: The hint label.
+        :param child: The element the hint is centered on.
+        :param alpha_mult: Multiplier applied to every alpha channel so
+            inactive layers can be dimmed.
+        """
+        (
+            hint_x,
+            hint_y,
+            hint_width,
+            hint_height,
+            hint_x_offset,
+            hint_y_offset,
+            text_x,
+            text_y,
+        ) = self._hint_rect(cr, hint_value, child)
+
+        utf8 = hint_value.upper() if self.hint_upercase else hint_value
+        hint_state = (
+            self.hint_selector_state.upper()
+            if self.hint_upercase
+            else self.hint_selector_state
+        )
+
+        cr.save()
+        cr.new_path()
+        cr.translate(hint_x, hint_y)
+        # adding offsets so that clicks sent happen in center of hints
+        # (matching the position of hints on elements)
+        self.hints_drawn_offsets[hint_value] = (
+            hint_x_offset + hint_width / 2,
+            hint_y_offset + hint_height / 2,
+        )
+
+        cr.rectangle(0, 0, hint_width, hint_height)
+        cr.set_source_rgba(
+            self.hint_background_r,
+            self.hint_background_g,
+            self.hint_background_b,
+            self.hint_background_a * alpha_mult,
+        )
+        cr.fill()
+
+        # draw hint
+        cr.move_to(text_x, text_y)
+        cr.set_source_rgba(
+            self.hint_font_r,
+            self.hint_font_g,
+            self.hint_font_b,
+            self.hint_font_a * alpha_mult,
+        )
+        cr.show_text(utf8)
+
+        cr.move_to(text_x, text_y)
+        cr.set_source_rgba(
+            self.hint_pressed_font_r,
+            self.hint_pressed_font_g,
+            self.hint_pressed_font_b,
+            self.hint_pressed_font_a * alpha_mult,
+        )
+        cr.show_text(hint_state)
+
+        cr.close_path()
+        cr.restore()
+
     def on_draw(self, _, cr: Context):
         """Draw hints.
 
@@ -221,77 +436,25 @@ class OverlayWindow(Gtk.Window):
             )
             self.launch_time = None
 
-        hint_height = self.hint_height
-
         cr.select_font_face(self.hint_font_face, FONT_SLANT_NORMAL, FONT_WEIGHT_BOLD)
         cr.set_font_size(self.hint_font_size)
 
-        for hint_value, child in self.hints.items():
-            x_loc, y_loc = child.relative_position
-            if x_loc >= 0 and y_loc >= 0:
-                cr.save()
-                utf8 = hint_value.upper() if self.hint_upercase else hint_value
-                hint_state = (
-                    self.hint_selector_state.upper()
-                    if self.hint_upercase
-                    else self.hint_selector_state
-                )
+        if self._layers_dirty:
+            self._assign_layers(cr)
+            self._layers_dirty = False
 
-                x_bearing, y_bearing, width, height, _, _ = cr.text_extents(utf8)
-                hint_width = width + self.hint_width_padding
-
-                cr.new_path()
-                # offset to bring top left corner of a hint to the correct possition
-                # so that the hint is centered on the object
-                hint_x_offset = child.width / 2 - hint_width / 2
-                hint_y_offset = child.height / 2 - hint_height / 2
-
-                hint_x = x_loc + hint_x_offset
-                hint_y = y_loc + hint_y_offset
-
-                cr.translate(hint_x, hint_y)
-                # adding offsets so that clicks sent happen in center of hints
-                # (matching the position of hints on elements)
-                self.hints_drawn_offsets[hint_value] = (
-                    hint_x_offset + hint_width / 2,
-                    hint_y_offset + hint_height / 2,
-                )
-
-                cr.rectangle(0, 0, hint_width, hint_height)
-                cr.set_source_rgba(
-                    self.hint_background_r,
-                    self.hint_background_g,
-                    self.hint_background_b,
-                    self.hint_background_a,
-                )
-                cr.fill()
-
-                hint_text_position = (
-                    (hint_width / 2) - (width / 2 + x_bearing),
-                    (hint_height / 2) - (height / 2 + y_bearing),
-                )
-
-                # draw hint
-                cr.move_to(*hint_text_position)
-                cr.set_source_rgba(
-                    self.hint_font_r,
-                    self.hint_font_g,
-                    self.hint_font_b,
-                    self.hint_font_a,
-                )
-                cr.show_text(utf8)
-
-                cr.move_to(*hint_text_position)
-                cr.set_source_rgba(
-                    self.hint_pressed_font_r,
-                    self.hint_pressed_font_g,
-                    self.hint_pressed_font_b,
-                    self.hint_pressed_font_a,
-                )
-                cr.show_text(hint_state)
-
-                cr.close_path()
-                cr.restore()
+        # Draw inactive layers first (dimmed), then the active layer on top so
+        # the raised hints read cleanly over any hints they overlap.
+        for active_pass in (False, True):
+            alpha_mult = 1.0 if active_pass else self.hint_inactive_layer_opacity
+            for hint_value, child in self.hints.items():
+                x_loc, y_loc = child.relative_position
+                if x_loc < 0 or y_loc < 0:
+                    continue
+                is_active = self.hint_layers.get(hint_value, 0) == self.active_layer
+                if is_active != active_pass:
+                    continue
+                self._draw_hint(cr, hint_value, child, alpha_mult)
 
     def update_hints(self, next_char: str):
         """Update hints on screen to eliminate options.
@@ -308,6 +471,11 @@ class OverlayWindow(Gtk.Window):
         if updated_hints:
             self.hints = updated_hints
             self.hint_selector_state += next_char
+
+        # The candidate set changed, so recolor on the next draw and start from
+        # the front layer (overlaps that have cleared collapse back to one).
+        self._layers_dirty = True
+        self.active_layer = 0
 
         self.drawing_area.queue_draw()
 
@@ -333,6 +501,15 @@ class OverlayWindow(Gtk.Window):
 
         if keyval_lower == self.exit_key:
             self._finish()
+            return
+
+        # Cycle which layer of overlapping hints is raised. Handled before any
+        # mouse-action/hint-character logic so the toggle key is never treated
+        # as a hint or recorded as an action.
+        if keyval_lower == self.layer_toggle_key:
+            if self.num_layers > 1:
+                self.active_layer = (self.active_layer + 1) % self.num_layers
+                self.drawing_area.queue_draw()
             return
 
         if modifiers == self.hover_modifier:

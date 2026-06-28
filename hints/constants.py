@@ -37,6 +37,12 @@ DEFAULT_CONFIG = {
         "hint_background_g": 1,
         "hint_background_b": 0.5,
         "hint_background_a": 0.8,
+        # Alpha multiplier applied to the background and text of hints that are
+        # not on the active layer, so the raised layer reads cleanly on top.
+        "hint_inactive_layer_opacity": 0.7,
+        # Pixels each hint rectangle is inflated by before the overlap test
+        # that assigns layers (readability tuning).
+        "hint_overlap_margin": 0,
     },
     "backends": {
         "enable": ["atspi", "opencv"],
@@ -106,6 +112,7 @@ DEFAULT_CONFIG = {
     "mouse_scroll_pixel_sensitivity": 5,
     "mouse_scroll_rampup_time": 0.5,
     "exit_key": Gdk.KEY_Escape,
+    "layer_toggle_key": Gdk.KEY_space,
     "hover_modifier": Gdk.ModifierType.CONTROL_MASK,
     "grab_modifier": Gdk.ModifierType.MOD1_MASK,  # Alt
     "overlay_x_offset": 0,
