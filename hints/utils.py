@@ -1,5 +1,6 @@
-from json import load
+from json import load, dump
 from typing import Any
+from pathlib import Path
 
 from hints.constants import CONFIG_PATH, DEFAULT_CONFIG
 
@@ -37,3 +38,21 @@ def load_config() -> HintsConfig:
         pass
 
     return merge_configs(config, DEFAULT_CONFIG)
+
+
+def save_default_config() -> bool:
+    """Create the default config file if it does not exist.
+
+    :return: if config file was created succesfully.
+    """
+    file_path = Path(CONFIG_PATH)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(file_path, "x", encoding="utf-8") as _f:
+            dump(DEFAULT_CONFIG, _f, indent=4)
+        return True
+    except FileExistsError:
+        return False
+    except (IOError, OSError):
+        return False

@@ -18,6 +18,8 @@ from socket import AF_UNIX, SOCK_STREAM, socket
 
 from hints import __version__
 from hints.ipc_constants import SOCKET_MESSAGE_SIZE, UNIX_DOMAIN_SOCKET_FILE
+from hints.utils import save_default_config
+from hints.constants import CONFIG_PATH
 
 
 def trigger_daemon(mode: str, verbose: int) -> dict:
@@ -88,10 +90,21 @@ def main():
     parser.add_argument(
         "-s", "--setup", action="store_true", default=False, help="Guided hints setup."
     )
+    parser.add_argument(
+        "-c", "--config", action="store_true", default=False, help="Generate default config."
+    )
     args = parser.parse_args()
 
     if args.version:
         print(__version__)
+        return
+
+    if args.config:
+        saved = save_default_config()
+        if saved:
+            print(f"Default config file was created at {CONFIG_PATH}")
+        else:
+            print(f"Failed to create default config file. Check that {CONFIG_PATH} does not exist.")
         return
 
     # Fast path: non-verbose hint mode triggers the warm daemon. Any verbose,
