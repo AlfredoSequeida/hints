@@ -59,6 +59,69 @@ curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.
 > curl -fsSL https://raw.githubusercontent.com/AlfredoSequeida/hints/main/install.sh | bash -s -- --version 0.0.7
 > ```
 
+## NixOS
+
+NixOS users can skip the install script and the `--setup` step entirely: this
+repository is a flake that ships both the package and a NixOS module which makes
+the changes `hints --setup` would otherwise make imperatively.
+
+Add the flake as an input:
+
+```nix
+{
+  inputs.hints.url = "github:DemyCode/hints";
+}
+```
+
+Then import the module and enable it:
+
+```nix
+{
+  imports = [ inputs.hints.nixosModules.default ];
+
+  services.hints = {
+    enable = true;
+    # Users that need access to /dev/uinput to synthesise mouse events.
+    users = [ "your-username" ];
+  };
+}
+```
+
+That gives you:
+
+- the `hints` and `hintsd` executables in `environment.systemPackages`
+- the `uinput` kernel module plus a udev rule granting the `input` group access
+  to `/dev/uinput`, and the listed users added to that group
+- the AT-SPI accessibility environment variables the AT-SPI backend needs
+- the AT-SPI bus (`services.gnome.at-spi2-core`)
+- a `hintsd` systemd **user** service, started with your graphical session
+- the GNOME Shell extension. On Wayland GNOME, enable it once with
+  `gnome-extensions enable hints@realh.co.uk`
+
+A reboot (or at least a re-login) is needed for the group membership and the
+session variables to take effect. Keybindings are still up to your window
+manager or desktop environment; see the links under [Setup](#setup).
+
+Useful options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `services.hints.package` | this flake's `hints` | Package to install. |
+| `services.hints.users` | `[ ]` | Users added to the `input` group. |
+| `services.hints.daemon.enable` | `true` | Run `hintsd` as a user service. |
+| `services.hints.daemon.wantedBy` | `[ "graphical-session.target" ]` | Use `[ "default.target" ]` for sessions that do not set up `graphical-session.target`. |
+| `services.hints.accessibility` | `true` | Set the AT-SPI environment variables. |
+
+To try it without changing your configuration:
+
+```
+nix run github:DemyCode/hints
+```
+
+There is also an overlay (`overlays.default`, providing `pkgs.hints`) and a
+development shell (`nix develop`) with all system and Python dependencies
+already available.
+
 ## Setup
 
 1. To facilitate setup, hints ships with a setup script.
