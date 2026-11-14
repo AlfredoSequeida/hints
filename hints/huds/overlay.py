@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from gi import require_foreign, require_version
 
 from hints.mouse_enums import MouseButton
-from hints.utils import HintsConfig
+from hints.utils import HintsConfig, keyval_in_any_layout
 
 require_version("Gdk", "3.0")
 require_version("Gtk", "3.0")
@@ -92,6 +92,8 @@ class OverlayWindow(Gtk.Window):
         self.hint_overlap_margin = hints_config["hint_overlap_margin"]
 
         # key settings
+        self.alphabet = config["alphabet"]
+        self.match_keys_in_any_layout = config["match_keys_in_any_layout"]
         self.exit_key = config["exit_key"]
         self.layer_toggle_key = config["layer_toggle_key"]
         self.hover_modifier = config["hover_modifier"]
@@ -497,7 +499,12 @@ class OverlayWindow(Gtk.Window):
             & ~consumed_modifiers
         )
 
-        keyval_lower = Gdk.keyval_to_lower(event.keyval)
+        resolved_keyval = (
+            keyval_in_any_layout(event, self.alphabet)
+            if self.match_keys_in_any_layout
+            else event.keyval
+        )
+        keyval_lower = Gdk.keyval_to_lower(resolved_keyval)
 
         if keyval_lower == self.exit_key:
             self._finish()
@@ -518,7 +525,7 @@ class OverlayWindow(Gtk.Window):
         if modifiers == self.grab_modifier:
             self.mouse_action.update({"action": "grab"})
 
-        if keyval_lower != event.keyval:
+        if keyval_lower != resolved_keyval:
             self.mouse_action.update({"action": "click", "button": MouseButton.RIGHT})
 
         hint_chr = chr(keyval_lower)

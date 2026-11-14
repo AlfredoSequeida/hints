@@ -97,6 +97,8 @@ DEFAULT_CONFIG = {
         },
     },
     "alphabet": "asdfgqwertzxcvbhjklyuiopnm",
+    # Try other layouts if the active one (e.g. Cyrillic) lacks a hint/move/scroll key.
+    "match_keys_in_any_layout": False,
     "mouse_move_left": "h",
     "mouse_move_right": "l",
     "mouse_move_up": "k",
