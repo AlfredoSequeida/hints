@@ -18,7 +18,7 @@ from gi import require_foreign, require_version
 
 from hints import mouse as default_mouse_client
 from hints.mouse_enums import MouseButton, MouseButtonState, MouseMode
-from hints.utils import HintsConfig
+from hints.utils import HintsConfig, keyval_in_any_layout
 
 require_version("Gdk", "3.0")
 require_version("Gtk", "3.0")
@@ -63,6 +63,11 @@ class InterceptorWindow(Gtk.Window):
         self.height = height
         self.mouse_action = mouse_action
         self.config = config
+        self.mouse_direction_keys = "".join(
+            config[f"mouse_{mode}_{direction}"]
+            for mode in ("move", "scroll")
+            for direction in ("left", "right", "up", "down")
+        )
         self.key_press_state: dict[str, Any] = {}
         self.is_wayland = is_wayland
         self.first_move = True
@@ -105,7 +110,8 @@ class InterceptorWindow(Gtk.Window):
     def on_key_press(self, _, event):
         """Handle key presses :param event: Event object."""
 
-        keyval_lower = Gdk.keyval_to_lower(event.keyval)
+        resolved_keyval = keyval_in_any_layout(event, self.mouse_direction_keys)
+        keyval_lower = Gdk.keyval_to_lower(resolved_keyval)
 
         if keyval_lower == self.config["exit_key"]:
             self._mouse.click(
