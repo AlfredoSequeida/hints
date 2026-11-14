@@ -93,6 +93,7 @@ class OverlayWindow(Gtk.Window):
 
         # key settings
         self.alphabet = config["alphabet"]
+        self.match_keys_in_any_layout = config["match_keys_in_any_layout"]
         self.exit_key = config["exit_key"]
         self.layer_toggle_key = config["layer_toggle_key"]
         self.hover_modifier = config["hover_modifier"]
@@ -498,7 +499,11 @@ class OverlayWindow(Gtk.Window):
             & ~consumed_modifiers
         )
 
-        resolved_keyval = keyval_in_any_layout(event, self.alphabet)
+        resolved_keyval = (
+            keyval_in_any_layout(event, self.alphabet)
+            if self.match_keys_in_any_layout
+            else event.keyval
+        )
         keyval_lower = Gdk.keyval_to_lower(resolved_keyval)
 
         if keyval_lower == self.exit_key:
