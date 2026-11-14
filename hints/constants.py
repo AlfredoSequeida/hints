@@ -97,8 +97,7 @@ DEFAULT_CONFIG = {
         },
     },
     "alphabet": "asdfgqwertzxcvbhjklyuiopnm",
-    # Match hint and move/scroll keys by physical key when the active layout
-    # (e.g. Cyrillic) doesn't produce them, like Vimium's ignoreKeyboardLayout.
+    # Try other layouts if the active one (e.g. Cyrillic) lacks a hint/move/scroll key.
     "match_keys_in_any_layout": False,
     "mouse_move_left": "h",
     "mouse_move_right": "l",
