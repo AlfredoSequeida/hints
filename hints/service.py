@@ -148,6 +148,17 @@ class Mouse:
             name="Hints absolute mouse",
         )
 
+    def close(self):
+        """Close the virtual uinput devices so they do not leak on reload."""
+        for dev_attr in ("relative_mouse", "absolute_mouse"):
+            dev = getattr(self, dev_attr, None)
+            if dev is not None:
+                try:
+                    dev.close()
+                except Exception:
+                    pass
+                setattr(self, dev_attr, None)
+
     def scroll(self, x: int, y: int, *_args, **_kwargs):
         """Scroll event.
 
@@ -290,7 +301,8 @@ class HintsService:
         Gtk.init()
 
         self.screen = Gdk.Screen.get_default()
-        self.mouse = Mouse(*_virtual_screen_size())
+        self._virtual_screen_dims = _virtual_screen_size()
+        self.mouse = Mouse(*self._virtual_screen_dims)
 
         # Hint overlay state. Only one overlay may be active at a time.
         self._overlay_active = False
@@ -368,6 +380,7 @@ class HintsService:
 
     def on_interrupt(self, *_):
         """Interrupt handler to clean up."""
+        self.mouse.close()
         self.socket.close()
         Gtk.main_quit()
 
@@ -377,7 +390,13 @@ class HintsService:
 
         :param screen: The screen object for the event.
         """
-        self.mouse = Mouse(*_virtual_screen_size())
+        new_size = _virtual_screen_size()
+        if new_size == self._virtual_screen_dims:
+            return
+        self._virtual_screen_dims = new_size
+        self.mouse.close()
+        self.mouse = Mouse(*new_size)
+        self._mouse_adapter._mouse = self.mouse
 
     def socket_connection(self):
         """Handle socket connection events.
