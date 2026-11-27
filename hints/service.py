@@ -19,7 +19,7 @@ import logging
 import socket
 from os import getenv, path, remove
 from pickle import dumps, loads
-from signal import SIGINT, signal
+from signal import SIGINT, SIGTERM, signal
 from time import sleep, time
 from typing import Any, Iterable
 
@@ -35,6 +35,7 @@ require_version("Gtk", "3.0")
 require_version("Atspi", "2.0")
 from gi.repository import Atspi, Gdk, GLib, Gtk
 
+from hints.backends.atspi import is_atspi_bus_available
 from hints.hints import create_gtk_window, gather_hints, get_window_system, load_backend
 from hints.huds.interceptor import InterceptorWindow
 from hints.huds.overlay import OverlayWindow
@@ -147,6 +148,17 @@ class Mouse:
             },
             name="Hints absolute mouse",
         )
+
+    def close(self):
+        """Close the virtual uinput devices so they do not leak on reload."""
+        for dev_attr in ("relative_mouse", "absolute_mouse"):
+            dev = getattr(self, dev_attr, None)
+            if dev is not None:
+                try:
+                    dev.close()
+                except Exception:
+                    pass
+                setattr(self, dev_attr, None)
 
     def scroll(self, x: int, y: int, *_args, **_kwargs):
         """Scroll event.
@@ -290,7 +302,8 @@ class HintsService:
         Gtk.init()
 
         self.screen = Gdk.Screen.get_default()
-        self.mouse = Mouse(*_virtual_screen_size())
+        self._virtual_screen_dims = _virtual_screen_size()
+        self.mouse = Mouse(*self._virtual_screen_dims)
 
         # Hint overlay state. Only one overlay may be active at a time.
         self._overlay_active = False
@@ -308,9 +321,13 @@ class HintsService:
         # This avoids the need to search the AT-SPI tree on every invocation.
         self._atspi_active_accessible: Atspi.Accessible | None = None
         try:
-            Atspi.get_desktop(0)
-            self._atspi_listener = Atspi.EventListener.new(self._on_window_activate)
-            self._atspi_listener.register("window:activate")
+            if is_atspi_bus_available():
+                Atspi.get_desktop(0)
+                self._atspi_listener = Atspi.EventListener.new(self._on_window_activate)
+                self._atspi_listener.register("window:activate")
+            else:
+                self._atspi_listener = None
+                logger.debug("AT-SPI bus unreachable; skipping AT-SPI warm-up")
         except Exception:  # pylint: disable=broad-except
             self._atspi_listener = None
             logger.debug("AT-SPI warm-up failed", exc_info=True)
@@ -361,6 +378,7 @@ class HintsService:
 
         self.screen.connect("size-changed", self.on_size_changed)
         signal(SIGINT, self.on_interrupt)
+        signal(SIGTERM, self.on_interrupt)
 
     def _on_window_activate(self, event: Atspi.Event):
         """Cache the accessible window that just became active."""
@@ -368,6 +386,7 @@ class HintsService:
 
     def on_interrupt(self, *_):
         """Interrupt handler to clean up."""
+        self.mouse.close()
         self.socket.close()
         Gtk.main_quit()
 
@@ -377,7 +396,13 @@ class HintsService:
 
         :param screen: The screen object for the event.
         """
-        self.mouse = Mouse(*_virtual_screen_size())
+        new_size = _virtual_screen_size()
+        if new_size == self._virtual_screen_dims:
+            return
+        self._virtual_screen_dims = new_size
+        self.mouse.close()
+        self.mouse = Mouse(*new_size)
+        self._mouse_adapter._mouse = self.mouse
 
     def socket_connection(self):
         """Handle socket connection events.

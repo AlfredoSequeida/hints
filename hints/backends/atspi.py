@@ -1,6 +1,7 @@
 """Accessibility backend to get elements from an application using Atspi."""
 
 import logging
+from os import getenv
 from time import sleep
 from typing import Literal
 
@@ -9,7 +10,7 @@ from gi import require_version
 from hints.window_systems.window_system_type import WindowSystemType
 
 require_version("Atspi", "2.0")
-from gi.repository import Atspi
+from gi.repository import Atspi, Gio, GLib
 
 from hints.backends.backend import HintsBackend
 from hints.backends.exceptions import AccessibleChildrenNotFoundError
@@ -17,6 +18,43 @@ from hints.child import Child
 from hints.constants import ELEMENT_DETAIL_LOG_LEVEL
 
 logger = logging.getLogger(__name__)
+
+
+def is_atspi_bus_available() -> bool:
+    """Return True if the AT-SPI accessibility bus accepts connections.
+
+    libatspi calls g_error() (aborting the process) when the bus socket
+    refuses connections; probing via Gio raises a catchable error instead.
+    """
+    try:
+        address = getenv("AT_SPI_BUS_ADDRESS")
+        if not address:
+            session_bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            result = session_bus.call_sync(
+                "org.a11y.Bus",
+                "/org/a11y/bus",
+                "org.a11y.Bus",
+                "GetAddress",
+                None,
+                GLib.VariantType("(s)"),
+                Gio.DBusCallFlags.NONE,
+                1000,
+                None,
+            )
+            address = result.unpack()[0]
+        if not address:
+            return False
+        conn = Gio.DBusConnection.new_for_address_sync(
+            address,
+            Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
+            | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
+            None,
+            None,
+        )
+        conn.close_sync(None)
+        return True
+    except Exception:  # pylint: disable=broad-except
+        return False
 
 
 class AtspiBackend(HintsBackend):
@@ -322,6 +360,10 @@ class AtspiBackend(HintsBackend):
         # propagate. Covers cold-start (daemon launched after the window was
         # already focused, so no window:activate event was received) and other
         # edge cases where the cache is absent or invalid.
+        if not is_atspi_bus_available():
+            logger.debug("AT-SPI bus is not reachable; skipping AT-SPI lookup")
+            return None
+
         attempts = 3
         for attempt in range(attempts):
             desktop = Atspi.get_desktop(0)
